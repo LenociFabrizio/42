@@ -9,6 +9,7 @@ import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
 import { createMap, addMarker, viewportBbox } from '../core/map.js';
 import { getCurrentPosition, decodePolyline } from '../core/geo.js';
+import { maybeAutoStart } from '../core/onboarding.js';
 import { $, svg, loader, toast, modal, el, fmtDistance, fmtDuration, debounce } from '../core/ui.js';
 import api from '../core/api.js';
 
@@ -31,6 +32,9 @@ async function main() {
 
   map = await createMap('map');
   loader.hide();
+
+  // Tutorial di benvenuto alla prima apertura dopo la registrazione.
+  maybeAutoStart();
 
   map.on('load', () => {
     locate(false);

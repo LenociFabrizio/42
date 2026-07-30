@@ -11,6 +11,7 @@ import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
 import { $, el, svg, loader, toast, modal, confirmDialog, debounce } from '../core/ui.js';
 import { LIVE_MAP_MIN_LEVEL } from '../core/constants.js';
+import { startTutorial } from '../core/onboarding.js';
 import api, { token } from '../core/api.js';
 
 const VIS = [
@@ -57,9 +58,18 @@ function build(root, s, me) {
     privacyCard(s),
     liveCard(me),
     notifyCard(s),
+    guideCard(),
     accountCard(),
     el('div', { class: 'legal-footer', html: '<a href="/privacy.html">Privacy</a><a href="/cookie.html">Cookie</a><a href="/terms.html">Termini</a>' }),
   );
+}
+
+/* -------------------- Guida / Tutorial -------------------- */
+function guideCard() {
+  return card('Guida', [
+    el('div', { class: 'text-lo', style: 'font-size:.82rem;margin-bottom:10px', text: "Ripeti il tutorial introduttivo dell'app." }),
+    el('button', { class: 'btn btn-outline btn-block', text: 'Rivedi il tutorial', onClick: () => startTutorial() }),
+  ]);
 }
 
 /* -------------------- Helpers UI -------------------- */

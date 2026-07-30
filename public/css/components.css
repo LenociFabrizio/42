@@ -299,3 +299,47 @@
 .legal-footer { text-align: center; font-size: 0.8rem; color: var(--text-lo); margin-top: var(--sp-4); display: flex; gap: var(--sp-3); justify-content: center; flex-wrap: wrap; }
 .legal-footer a { color: var(--text-lo); }
 .legal-footer a:hover { color: var(--text-mid); }
+
+/* ---------------- Tutorial / onboarding ---------------- */
+.tour-overlay {
+  position: fixed; inset: 0; z-index: 1300;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(80% 55% at 50% 0%, rgba(255,176,32,0.12), transparent 60%),
+    rgba(6, 7, 10, 0.86);
+  backdrop-filter: blur(6px);
+  opacity: 0; transition: opacity 0.3s ease;
+}
+.tour-overlay.open { opacity: 1; }
+.tour-card {
+  position: relative;
+  width: 100%; max-width: 440px;
+  background: var(--bg-100);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 32px 24px 24px;
+  box-shadow: var(--sh-lg);
+  text-align: center;
+}
+.tour-skip {
+  position: absolute; top: 12px; right: 14px;
+  background: none; border: none; color: var(--text-lo);
+  font-size: 0.85rem; font-weight: var(--fw-semibold);
+}
+.tour-ic {
+  width: 92px; height: 92px; margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 3rem;
+  background: radial-gradient(circle at 30% 25%, var(--bg-200), var(--bg-050));
+  border: 2px solid var(--accent);
+}
+.tour-card h2 { font-size: 1.5rem; margin-bottom: 8px; }
+.tour-card .tour-text { color: var(--text-mid); line-height: 1.6; min-height: 4.8em; }
+.tour-dots { display: flex; gap: 7px; justify-content: center; margin: 20px 0 22px; }
+.tour-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--gauge-track); transition: all 0.25s ease; }
+.tour-dots i.on { background: var(--accent); width: 22px; border-radius: var(--r-pill); }
+.tour-actions { display: flex; gap: 10px; }
+.tour-actions .btn { flex: 1; }
+.tour-progress-label { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 10px; letter-spacing: 0.04em; }

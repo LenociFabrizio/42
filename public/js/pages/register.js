@@ -3,6 +3,7 @@ import '../core/theme.js';
 import { auth } from '../core/auth.js';
 import { $, toast } from '../core/ui.js';
 import { initConsent } from '../core/consent.js';
+import { markTutorialPending } from '../core/onboarding.js';
 
 if (auth.isLogged()) location.href = '/index.html';
 initConsent();
@@ -25,6 +26,7 @@ form.addEventListener('submit', async (e) => {
   btn.textContent = 'Creazione…';
   try {
     await auth.register({ nickname, email, password });
+    markTutorialPending(); // mostra il tutorial alla prima apertura della mappa
     toast.success('Benvenuto in 4 & | 2! +100 XP 🎉');
     setTimeout(() => (location.href = '/index.html'), 700);
   } catch (err) {
