@@ -21,13 +21,18 @@ const NAV = [
 export function openCreateSheet() {
   const grid = el('div', { class: 'choice' }, [
     el('button', { onClick: () => (location.href = '/record.html') }, [
-      el('div', { class: 'ci', html: svg('route', 34) }),
-      el('strong', { text: 'Crea Percorso' }),
-      el('span', { class: 'text-lo', style: 'font-size:.8rem', text: 'Registra o traccia un itinerario' }),
+      el('div', { class: 'ci', html: svg('play', 32) }),
+      el('strong', { text: 'Registra percorso' }),
+      el('span', { class: 'text-lo', style: 'font-size:.8rem', text: 'Traccia col GPS mentre guidi' }),
     ]),
-    el('button', { onClick: () => (location.href = '/event-create.html') }, [
-      el('div', { class: 'ci', html: svg('calendar', 34) }),
-      el('strong', { text: 'Crea Evento' }),
+    el('button', { onClick: () => (location.href = '/route-create.html') }, [
+      el('div', { class: 'ci', html: svg('pin', 32) }),
+      el('strong', { text: 'Disegna percorso' }),
+      el('span', { class: 'text-lo', style: 'font-size:.8rem', text: 'Posiziona partenza e arrivo sulla mappa' }),
+    ]),
+    el('button', { style: 'grid-column:1/-1', onClick: () => (location.href = '/event-create.html') }, [
+      el('div', { class: 'ci', html: svg('calendar', 32) }),
+      el('strong', { text: 'Crea evento' }),
       el('span', { class: 'text-lo', style: 'font-size:.8rem', text: 'Organizza un raduno live' }),
     ]),
   ]);
@@ -47,6 +52,7 @@ function buildTopbar() {
   const bar = el('header', { class: 'topbar' }, [
     el('a', { href: '/index.html', class: 'brand' }, [
       el('span', { class: 'brand-logo', html: `4 <span class="amp">&amp;</span><span class="sep">|</span> 2` }),
+      el('span', { class: 'beta-tag', text: 'Beta' }),
     ]),
     el('div', { class: 'topbar-actions' }, [bell, ring]),
   ]);

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#06070a" />
+  <title>Disegna percorso · 4 &amp; | 2</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/variables.css" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/animations.css" />
+</head>
+<body>
+  <div id="app-loader"><div class="spinner"></div></div>
+
+  <div class="map-root"><div id="map"></div></div>
+
+  <header class="topbar">
+    <a href="/index.html" id="back-btn" class="btn-icon btn-ghost" aria-label="Indietro"></a>
+    <span class="brand-logo" style="font-size:1.05rem">Disegna percorso</span>
+    <span style="width:44px"></span>
+  </header>
+
+  <div class="hud hud-top">
+    <div class="card-glass card-pad" id="hint" style="font-size:.9rem">
+      Tocca la mappa per posizionare la <b>partenza</b> 🏁, poi i punti del percorso. L'ultimo punto sarà l'<b>arrivo</b> 🏆.
+    </div>
+  </div>
+
+  <div class="map-fab-stack">
+    <button id="fab-locate" class="map-fab" aria-label="La mia posizione"></button>
+  </div>
+
+  <div class="hud hud-bottom">
+    <div class="card-glass card-pad" style="width:100%">
+      <div class="flex justify-between items-center" style="margin-bottom:10px">
+        <span class="text-lo" style="font-size:.85rem">Punti: <b class="num text-hi" id="pt-count">0</b></span>
+        <span class="text-lo" style="font-size:.85rem">Distanza: <b class="num text-accent" id="pt-dist">0 m</b></span>
+      </div>
+      <div class="flex gap-2">
+        <button id="btn-undo" class="btn btn-outline" style="flex:1" disabled>Annulla ultimo</button>
+        <button id="btn-continue" class="btn btn-primary" style="flex:2" disabled>Continua</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/pages/route-create.js"></script>
+</body>
+</html>

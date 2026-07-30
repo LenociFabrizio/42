@@ -66,21 +66,24 @@ export function trackMetrics(points = []) {
   for (const p of points) {
     if (prev) {
       const d = haversine(lat(prev), lng(prev), lat(p), lng(p));
-      // Scarta outlier assurdi (> 2km fra due campioni consecutivi).
-      if (d <= 2000) {
-        distance += d;
-        // Dislivello
-        const e0 = prev.ele, e1 = p.ele;
-        if (typeof e0 === 'number' && typeof e1 === 'number' && e1 > e0) {
-          elevationGain += e1 - e0;
-        }
-        // Velocità da timestamp
-        if (typeof prev.t === 'number' && typeof p.t === 'number' && p.t > prev.t) {
-          const dtS = (p.t - prev.t) / 1000;
+      // Glitch GPS: SALTO grande in POCO tempo. Lo riconosciamo solo se ci sono
+      // i timestamp (traccia registrata) e la velocità implicita è irrealistica
+      // (> 400 km/h). Sui percorsi DISEGNATI a mano i punti non hanno timestamp
+      // e possono distare km: in quel caso la distanza va sempre contata.
+      let glitch = false;
+      if (typeof prev.t === 'number' && typeof p.t === 'number' && p.t > prev.t) {
+        const dtS = (p.t - prev.t) / 1000;
+        const v = (d / dtS) * 3.6; // km/h
+        if (v > 400) glitch = true;
+        else {
           movingTimeS += dtS;
-          const v = (d / dtS) * 3.6; // km/h
-          if (v < 400 && v > maxSpeed) maxSpeed = v; // scarta glitch
+          if (v > maxSpeed) maxSpeed = v;
         }
+      }
+      if (!glitch) {
+        distance += d;
+        const e0 = prev.ele, e1 = p.ele;
+        if (typeof e0 === 'number' && typeof e1 === 'number' && e1 > e0) elevationGain += e1 - e0;
       }
     }
     if (typeof p.speed === 'number') {

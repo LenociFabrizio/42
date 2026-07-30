@@ -343,3 +343,15 @@
 .tour-actions { display: flex; gap: 10px; }
 .tour-actions .btn { flex: 1; }
 .tour-progress-label { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 10px; letter-spacing: 0.04em; }
+
+/* ---------------- Targhetta BETA ---------------- */
+.beta-tag {
+  display: inline-flex; align-items: center;
+  padding: 2px 7px; margin-left: 6px;
+  border-radius: var(--r-sm);
+  font-family: var(--font-display); font-weight: var(--fw-bold);
+  font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1;
+  color: var(--accent); background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  vertical-align: middle;
+}
