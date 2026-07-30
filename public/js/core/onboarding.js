@@ -3,49 +3,49 @@
    (e ripetibile dalle Impostazioni). Slide a tutto schermo con
    avanti/indietro, punti di avanzamento e "salta".
    ============================================================= */
-import { el } from './ui.js';
+import { el, svg } from './ui.js';
 
 const DONE_KEY = '4e2_tutorial_done';
 const PENDING_KEY = '4e2_tutorial_pending';
 
 const SLIDES = [
   {
-    ic: '🏍️',
+    ic: 'route',
     title: 'Benvenuto in 4 & | 2',
     text: 'La community di chi ama viaggiare su 4 e 2 ruote. In un minuto ti mostriamo come funziona.',
   },
   {
-    ic: '🗺️',
+    ic: 'map',
     title: 'La Mappa è la tua base',
     text: 'Attorno a te trovi percorsi, eventi e punti di interesse. Usa il pulsante in basso a destra per centrarti sulla tua posizione.',
   },
   {
-    ic: '➕',
+    ic: 'plus',
     title: 'Il pulsante CREA',
     text: 'Il tasto centrale in basso apre la creazione: registra un nuovo Percorso col GPS oppure organizza un Evento.',
   },
   {
-    ic: '⏱️',
+    ic: 'trophy',
     title: 'Percorsi e Record',
     text: 'Registra un tracciato mentre guidi. Il record ufficiale appartiene a chi crea il percorso; tu conservi il tuo miglior tempo personale e scali la classifica.',
   },
   {
-    ic: '📣',
+    ic: 'megaphone',
     title: 'Eventi live',
     text: 'Organizza o partecipa a raduni. Il check-in avviene via GPS: risulti presente solo se sei davvero sul luogo del ritrovo.',
   },
   {
-    ic: '👥',
+    ic: 'users',
     title: 'Club e Amici',
     text: 'Unisciti a un club, aggiungi amici e scalate insieme le classifiche. Le richieste di amicizia si gestiscono dalla sezione Amici.',
   },
   {
-    ic: '🏆',
+    ic: 'award',
     title: 'Livelli, XP e Badge',
     text: 'Ogni attività reale ti fa guadagnare XP e sblocca badge e livelli. La posizione live con gli amici è sempre disponibile (col tuo consenso); agli sconosciuti appari dal livello 5.',
   },
   {
-    ic: '🔒',
+    ic: 'lock',
     title: 'Privacy sotto controllo',
     text: 'La tua posizione è condivisa solo se lo attivi tu. Puoi cambiare visibilità e preferenze quando vuoi da Impostazioni. Buon viaggio!',
   },
@@ -75,7 +75,7 @@ export function startTutorial() {
   function go(n) { i = Math.max(0, Math.min(SLIDES.length - 1, n)); render(); }
   function render() {
     const s = SLIDES[i];
-    ic.textContent = s.ic;
+    ic.innerHTML = svg(s.ic, 46);
     label.textContent = `${i + 1} / ${SLIDES.length}`;
     title.textContent = s.title;
     text.textContent = s.text;

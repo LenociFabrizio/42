@@ -8,24 +8,9 @@ import '../core/theme.js';
 import { guard } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
-import { $, el, loader, toast, timeAgo } from '../core/ui.js';
+import { $, el, svg, loader, toast, timeAgo } from '../core/ui.js';
+import { notifIcon } from '../core/constants.js';
 import api from '../core/api.js';
-
-const TYPE_ICON = {
-  friend_request: '🤝',
-  friend_accepted: '✅',
-  record_beaten: '🏁',
-  badge: '🏅',
-  level_up: '⭐',
-  mission: '✅',
-};
-
-function iconFor(type) {
-  if (TYPE_ICON[type]) return TYPE_ICON[type];
-  if (type && type.startsWith('event')) return '📣';
-  if (type && type.startsWith('club')) return '👥';
-  return '🔔';
-}
 
 function linkFor(n) {
   const d = n.data || {};
@@ -36,7 +21,7 @@ function linkFor(n) {
   return null;
 }
 
-const empty = () => el('div', { class: 'empty' }, [el('div', { class: 'ic', text: '🔔' }), el('p', { text: 'Nessuna notifica' })]);
+const empty = () => el('div', { class: 'empty' }, [el('div', { class: 'ic', html: svg('bell', 46) }), el('p', { text: 'Nessuna notifica' })]);
 
 async function main() {
   const user = await guard();
@@ -56,7 +41,7 @@ async function main() {
     if (unread > 0) api.post('/notifications/read-all').catch(() => { /* silenzioso */ });
   } catch (err) {
     wrap.append(el('div', { class: 'empty' }, [
-      el('div', { class: 'ic', text: '⚠️' }),
+      el('div', { class: 'ic', html: svg('alert', 46) }),
       el('p', { text: err.message || 'Impossibile caricare le notifiche.' }),
     ]));
   } finally {
@@ -81,9 +66,9 @@ function row(wrap, n) {
   };
   if (href) attrs.href = href;
 
-  const del = el('button', { class: 'btn btn-icon btn-ghost', 'aria-label': 'Elimina', text: '✕' });
+  const del = el('button', { class: 'btn btn-icon btn-ghost', 'aria-label': 'Elimina', html: svg('x', 18) });
   const item = el(href ? 'a' : 'div', attrs, [
-    el('div', { style: 'font-size:1.5rem;flex-shrink:0;line-height:1', text: iconFor(n.type) }),
+    el('div', { style: 'flex-shrink:0;line-height:1', html: svg(notifIcon(n.type), 24) }),
     el('div', { class: 'li-body' }, [
       el('div', { class: 'li-title', text: n.title || '' }),
       n.body ? el('div', { class: 'li-sub', text: n.body }) : null,

@@ -355,3 +355,32 @@
   border: 1px solid var(--accent);
   vertical-align: middle;
 }
+
+/* ---------------- Icone SVG a tema nei componenti ---------------- */
+/* Marker mappa: icona SVG centrata, colore in base al tipo di pin. */
+.mk span svg { display: block; }
+.mk.route span { color: #120a00; }
+.mk.event span, .mk.poi span, .mk.club span { color: #ffffff; }
+
+/* Tutorial: icona SVG grande nell'anello. */
+.tour-ic svg { width: 46px; height: 46px; color: var(--accent); }
+
+/* Badge gamification: icona SVG, colore in base al livello (tier). */
+.gbadge .ic svg { width: 30px; height: 30px; }
+.gbadge .ic { color: var(--accent); }
+.gbadge.bronze .ic { color: var(--bronze); }
+.gbadge.silver .ic { color: var(--silver); }
+.gbadge.gold .ic { color: var(--gold); }
+.gbadge.special .ic { color: var(--accent); }
+
+/* Empty state: icona SVG al posto dell'emoji. */
+.empty .ic svg { width: 46px; height: 46px; margin: 0 auto; color: var(--text-dim); }
+
+/* Pulsante logout ben visibile (rosso, in evidenza). */
+.btn-logout { color: var(--danger); border-color: var(--danger); background: transparent; }
+.btn-logout:hover { background: rgba(255, 59, 48, 0.12); color: var(--danger); }
+
+/* Bottoni di navigazione nel profilo (Impostazioni / Amici / Club). */
+.profile-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
+.profile-nav .btn { flex-direction: column; gap: 6px; min-height: 68px; padding: 10px 6px; font-size: 0.82rem; }
+.profile-nav .btn svg { width: 22px; height: 22px; }

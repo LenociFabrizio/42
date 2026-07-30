@@ -123,9 +123,9 @@ main().then(() => {
 
 /* -------------------- Salvataggio nuovo percorso -------------------- */
 function openSaveSheet(result) {
-  const catSel = ROUTE_CATEGORIES.map((c) => `<option value="${c.v}">${c.ic} ${c.l}</option>`).join('');
+  const catSel = ROUTE_CATEGORIES.map((c) => `<option value="${c.v}">${c.l}</option>`).join('');
   const diffSel = ROUTE_DIFFICULTIES.map((d) => `<option value="${d.v}" ${d.v === 'media' ? 'selected' : ''}>${d.l}</option>`).join('');
-  const vehSel = ROUTE_VEHICLE_TYPES.map((v) => `<option value="${v.v}">${v.ic} ${v.l}</option>`).join('');
+  const vehSel = ROUTE_VEHICLE_TYPES.map((v) => `<option value="${v.v}">${v.l}</option>`).join('');
 
   const form = el('div', { html: `
     <div class="stats-row mb-4">

@@ -54,15 +54,17 @@
 .topbar-actions { display: flex; align-items: center; gap: var(--sp-2); }
 
 /* Campanella notifiche con badge */
-.bell { position: relative; }
+.bell { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.bell svg { display: block; }
 .bell .dot {
-  position: absolute; top: 4px; right: 4px;
-  min-width: 18px; height: 18px; padding: 0 4px;
+  position: absolute; top: 6px; right: 6px;
+  min-width: 16px; height: 16px; padding: 0 4px;
   background: var(--redline);
-  color: #fff; font-size: 0.7rem; font-weight: 700;
+  color: #fff; font-size: 0.62rem; font-weight: 700; line-height: 1;
   border-radius: var(--r-pill);
   display: flex; align-items: center; justify-content: center;
   border: 2px solid var(--bg-000);
+  transform: translate(35%, -35%);
 }
 
 /* Avatar in topbar con anello livello */
@@ -161,7 +163,9 @@
 }
 .crea-fab svg { width: 30px; height: 30px; }
 .crea-fab:active { transform: translateX(-50%) scale(0.93); }
-.nav-crea .navitem { padding-top: 22px; }
+/* La label "Crea" allineata in basso come le altre voci, sotto al FAB. */
+.navitem.nav-crea { justify-content: flex-end; padding-bottom: 8px; }
+.navitem.nav-crea span { color: var(--accent); font-weight: var(--fw-bold); }
 
 /* ---------------- Auth (login/registrazione) ---------------- */
 .auth-wrap {

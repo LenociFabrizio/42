@@ -67,7 +67,7 @@ function buildBottomNav(active) {
       const fab = el('button', { class: 'crea-fab', 'aria-label': 'Crea', html: svg('plus', 30), onClick: openCreateSheet });
       const wrap = el('div', { class: 'navitem nav-crea' }, [
         fab,
-        el('span', { text: 'CREA' }),
+        el('span', { text: 'Crea' }),
       ]);
       nav.append(wrap);
     } else {

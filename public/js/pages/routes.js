@@ -26,8 +26,8 @@ async function main() {
 
 /** Monta l'intestazione, i controlli di ricerca/filtro e il contenitore risultati. */
 function buildUi() {
-  const catChips = [{ v: '', l: 'Tutti', ic: '' }, ...ROUTE_CATEGORIES]
-    .map((c) => `<button class="chip ${c.v === state.category ? 'active' : ''}" data-cat="${c.v}">${c.ic ? c.ic + ' ' : ''}${c.l}</button>`)
+  const catChips = [{ v: '', l: 'Tutti' }, ...ROUTE_CATEGORIES]
+    .map((c) => `<button class="chip ${c.v === state.category ? 'active' : ''}" data-cat="${c.v}">${c.icon ? svg(c.icon, 16) + ' ' : ''}${c.l}</button>`)
     .join('');
   const diffSeg = [{ v: '', l: 'Tutte' }, ...ROUTE_DIFFICULTIES]
     .map((d) => `<button class="${d.v === state.difficulty ? 'active' : ''}" data-diff="${d.v}">${d.l}</button>`)
@@ -88,7 +88,7 @@ async function fetchRoutes() {
     renderRoutes(routes || []);
   } catch (err) {
     if (mine !== reqId) return;
-    $('#results').innerHTML = `<div class="empty"><div class="ic">📡</div><p>Impossibile caricare i percorsi.</p></div>`;
+    $('#results').innerHTML = `<div class="empty"><div class="ic">${svg('alert', 46)}</div><p>Impossibile caricare i percorsi.</p></div>`;
     toast.error(err.message || 'Errore di rete.');
   }
 }
@@ -102,7 +102,7 @@ function renderRoutes(routes) {
   if (!routes.length) {
     $('#results').innerHTML = `
       <div class="empty">
-        <div class="ic">🗺️</div>
+        <div class="ic">${svg('route', 46)}</div>
         <p>Nessun percorso trovato.</p>
         <p class="text-lo" style="font-size:.85rem">Prova a cambiare categoria o termine di ricerca.</p>
       </div>`;
@@ -121,16 +121,16 @@ function tileHtml(r) {
   <a class="tile" href="/route.html?id=${r.id}">
     <div class="cover" style="${cover}">
       <div class="overlay"></div>
-      <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:3rem;${r.photo ? 'opacity:.35' : ''}">${catIcon(r.category)}</span>
+      <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;${r.photo ? 'opacity:.35' : ''}">${svg(catIcon(r.category), 44)}</span>
       <div class="badges">
-        <span class="chip sm">${catIcon(r.category)} ${esc(catLabel(r.category))}</span>
+        <span class="chip sm">${svg(catIcon(r.category), 14)} ${esc(catLabel(r.category))}</span>
         <span class="${diffCls}" title="${esc(r.difficulty || '')}">${dots}</span>
       </div>
     </div>
     <div class="body">
       <h3 class="truncate">${esc(r.name)}</h3>
       <div class="text-lo" style="font-size:.82rem;margin-top:4px">
-        ${fmtDistance(r.distance_m)} · ${fmtDuration(r.est_time_s)} · ❤ ${r.likes_count ?? 0}
+        ${fmtDistance(r.distance_m)} · ${fmtDuration(r.est_time_s)} · ${svg('heart', 14)} ${r.likes_count ?? 0}
       </div>
     </div>
   </a>`;

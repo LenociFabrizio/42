@@ -140,6 +140,31 @@ export class GpsTracker {
   }
 }
 
+/**
+ * Calcola un percorso che SEGUE LE STRADE tra i waypoint usando OSRM
+ * (istanza demo pubblica, senza chiave). Ritorna
+ *   { points: [[lat,lng], ...], distance_m, duration_s }
+ * dove `points` è la geometria stradale. In caso di errore/limite ritorna
+ * null, così il chiamante può ripiegare sulla linea dritta tra i punti.
+ * @param {Array<{lat:number,lng:number}>} waypoints  almeno 2
+ * @param {string} profile  'driving' (default) | 'bike' | 'foot'
+ */
+export async function roadRoute(waypoints, profile = 'driving') {
+  if (!waypoints || waypoints.length < 2) return null;
+  const coords = waypoints.map((p) => `${p.lng},${p.lat}`).join(';');
+  const url = `https://router.project-osrm.org/route/v1/${profile}/${coords}?overview=full&geometries=polyline`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const r = data.routes && data.routes[0];
+    if (!r || !r.geometry) return null;
+    return { points: decodePolyline(r.geometry), distance_m: Math.round(r.distance), duration_s: Math.round(r.duration) };
+  } catch {
+    return null;
+  }
+}
+
 /** Ottiene la posizione corrente una tantum (Promise). */
 export function getCurrentPosition(opts = { enableHighAccuracy: true, timeout: 12000 }) {
   return new Promise((resolve, reject) => {

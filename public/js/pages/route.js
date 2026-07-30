@@ -76,7 +76,7 @@ function render(data) {
     </a>
 
     <div class="flex gap-2 wrap mb-4">
-      <span class="chip sm">${catIcon(route.category)} ${esc(catLabel(route.category))}</span>
+      <span class="chip sm">${svg(catIcon(route.category), 14)} ${esc(catLabel(route.category))}</span>
       <span class="chip sm">${diffDots(route.difficulty)} ${esc(diffLbl)}</span>
       ${tags.map((t) => `<span class="chip sm">#${esc(t)}</span>`).join('')}
     </div>
@@ -91,7 +91,7 @@ function render(data) {
     </div>
 
     <div class="card mb-3" style="border-color:var(--accent-dim)">
-      <div class="section-label">🏆 Record ufficiale</div>
+      <div class="section-label flex items-center gap-2">${svg('trophy', 16)} Record ufficiale</div>
       ${record ? `
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-2">
@@ -130,7 +130,7 @@ function render(data) {
       </div>` : ''}
 
     <h2 class="mb-3 mt-4">Classifica tempi</h2>
-    <div id="lb"><div class="empty"><div class="ic">⏱️</div><p class="text-lo">Caricamento classifica…</p></div></div>
+    <div id="lb"><div class="empty"><div class="ic">${svg('clock', 46)}</div><p class="text-lo">Caricamento classifica…</p></div></div>
   `;
 
   renderLike();
@@ -165,11 +165,11 @@ async function initMap() {
       setRouteLine(map, 'r', points);
       const start = points[0];
       const end = points[points.length - 1];
-      addMarker(map, { lat: start[0], lng: start[1], className: 'mk route', html: '🏁' });
-      addMarker(map, { lat: end[0], lng: end[1], className: 'mk route', html: '🏆' });
+      addMarker(map, { lat: start[0], lng: start[1], className: 'mk route', html: svg('flag', 14) });
+      addMarker(map, { lat: end[0], lng: end[1], className: 'mk route', html: svg('trophy', 14) });
       fitPoints(map, points);
     } else if (route.start_lat != null) {
-      addMarker(map, { lat: route.start_lat, lng: route.start_lng, className: 'mk route', html: '🏁' });
+      addMarker(map, { lat: route.start_lat, lng: route.start_lng, className: 'mk route', html: svg('flag', 14) });
       map.jumpTo({ center: [route.start_lng, route.start_lat], zoom: 12 });
     }
     map.resize();
@@ -217,7 +217,7 @@ async function onShare() {
 
 /* -------------------- Modifica (solo creatore) -------------------- */
 function openEdit() {
-  const catSel = ROUTE_CATEGORIES.map((c) => `<option value="${c.v}" ${c.v === route.category ? 'selected' : ''}>${c.ic} ${c.l}</option>`).join('');
+  const catSel = ROUTE_CATEGORIES.map((c) => `<option value="${c.v}" ${c.v === route.category ? 'selected' : ''}>${c.l}</option>`).join('');
   const diffSel = ROUTE_DIFFICULTIES.map((d) => `<option value="${d.v}" ${d.v === route.difficulty ? 'selected' : ''}>${d.l}</option>`).join('');
 
   const form = el('div', { html: `
@@ -282,7 +282,7 @@ async function loadLeaderboard() {
     const { leaderboard } = await api.get(`/routes/${id}/leaderboard`);
     renderLeaderboard(leaderboard || []);
   } catch {
-    $('#lb').innerHTML = `<div class="empty"><div class="ic">⏱️</div><p class="text-lo">Classifica non disponibile.</p></div>`;
+    $('#lb').innerHTML = `<div class="empty"><div class="ic">${svg('clock', 46)}</div><p class="text-lo">Classifica non disponibile.</p></div>`;
   }
 }
 
@@ -290,7 +290,7 @@ function renderLeaderboard(rows) {
   if (!rows.length) {
     $('#lb').innerHTML = `
       <div class="empty">
-        <div class="ic">🏁</div>
+        <div class="ic">${svg('flag', 46)}</div>
         <p>Ancora nessun tempo registrato.</p>
         <p class="text-lo" style="font-size:.85rem">Sii il primo a scalare la classifica!</p>
       </div>`;
@@ -301,8 +301,8 @@ function renderLeaderboard(rows) {
 
 function rowHtml(r) {
   const rankCls = r.rank === 1 ? 'gold' : r.rank === 2 ? 'silver' : r.rank === 3 ? 'bronze' : '';
-  const badge = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : r.rank;
-  const creatorPill = r.is_creator ? ' <span class="pill accent">👑 creatore</span>' : '';
+  const badge = (r.rank >= 1 && r.rank <= 3) ? svg('medal', 20) : r.rank;
+  const creatorPill = r.is_creator ? ` <span class="pill accent">${svg('star', 14)} creatore</span>` : '';
   return `
   <a class="list-item" href="/profile.html?id=${r.user_id}">
     <div class="li-rank ${rankCls}">${badge}</div>

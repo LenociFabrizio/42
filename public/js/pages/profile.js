@@ -1,10 +1,10 @@
 /* =============================================================
    profile.js — Pagina Profilo.
-   - Profilo proprio (default): intestazione con anello livello,
-     barra XP, statistiche, veicoli, distintivi, missioni, classifica.
-     Con azioni: modifica profilo/avatar, cambia password, logout.
-   - Profilo altrui (?id=…): sola lettura. Se privato, mostra una
-     scheda minima.
+   - Profilo proprio: intestazione con anello livello, barra XP,
+     statistiche, azioni (modifica/password/nav/logout), veicoli,
+     distintivi, missioni, classifica.
+   - Profilo altrui (?id=…): sola lettura + azione "Aggiungi amico".
+   Icone: set SVG a tema (niente emoji).
    ============================================================= */
 import '../core/theme.js';
 import { guard, auth } from '../core/auth.js';
@@ -12,15 +12,14 @@ import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
 import { xpMeter, levelTitle, ringPercent } from '../core/gamification.js';
 import { $, el, svg, loader, toast, modal, confirmDialog, fmtDistance, fmtDuration, fmtNum, qs } from '../core/ui.js';
-import { VEHICLE_TYPES } from '../core/constants.js';
+import { VEHICLE_TYPES, vehIcon, badgeIcon } from '../core/constants.js';
 import api from '../core/api.js';
 
 const DEFAULT_AVATAR = '/images/avatars/default.svg';
 const TIERS = ['bronze', 'silver', 'gold', 'special'];
 const tierClass = (t) => (TIERS.includes(t) ? t : 'bronze');
-const vehIcon = (type) => (type === 'moto' ? '🏍️' : '🚗');
 const stat = (v, k) => el('div', { class: 'stat' }, [el('div', { class: 'v', text: v }), el('div', { class: 'k', text: k })]);
-const empty = (ic, msg) => el('div', { class: 'empty' }, [el('div', { class: 'ic', text: ic }), el('p', { text: msg })]);
+const empty = (iconName, msg) => el('div', { class: 'empty' }, [el('div', { class: 'ic', html: svg(iconName, 46) }), el('p', { text: msg })]);
 
 async function main() {
   const me = await guard();
@@ -35,7 +34,7 @@ async function main() {
     if (isOwn) await renderOwn(root);
     else await renderOther(root, viewId);
   } catch (err) {
-    root.append(empty('⚠️', err.message || 'Impossibile caricare il profilo.'));
+    root.append(empty('alert', err.message || 'Impossibile caricare il profilo.'));
   } finally {
     loader.hide();
   }
@@ -72,17 +71,69 @@ async function renderOther(root, id) {
       ]),
       el('h1', { text: u.nickname || '—' }),
       el('div', { style: 'margin-top:var(--sp-2)' }, [el('span', { class: 'pill accent', text: `Liv. ${u.level || 1}` })]),
-      el('p', { class: 'text-lo', style: 'margin-top:var(--sp-3)', text: '🔒 Profilo privato' }),
+      el('p', { class: 'text-lo flex items-center justify-center gap-2', style: 'margin-top:var(--sp-3)', html: `${svg('lock', 16)} Profilo privato` }),
     ]));
+    const fa = await friendActionCard(id);
+    if (fa) root.append(fa);
     return;
   }
   const user = data.user;
+  root.append(headerCard(user, false));
+  const fa = await friendActionCard(id);
+  if (fa) root.append(fa);
   root.append(
-    headerCard(user, false),
     statsCard(user),
     vehiclesCard(data.vehicles || [], false),
     badgesCard(data.badges || [], false),
   );
+}
+
+/* -------------------- Azione amicizia (profilo altrui) -------------------- */
+async function friendActionCard(targetId) {
+  let fr, rq;
+  try {
+    [fr, rq] = await Promise.all([api.get('/friends'), api.get('/friends/requests')]);
+  } catch {
+    return null;
+  }
+  const isFriend = (fr.friends || []).some((f) => String(f.id) === String(targetId));
+  const out = (rq.outgoing || []).find((r) => String(r.to?.id) === String(targetId));
+  const inc = (rq.incoming || []).find((r) => String(r.from?.id) === String(targetId));
+  const card = el('div', { class: 'card', style: 'margin-top:var(--sp-3)' });
+
+  if (isFriend) {
+    card.append(el('span', { class: 'pill green', html: `${svg('check', 14)} Siete amici` }));
+    return card;
+  }
+  if (out) {
+    card.append(el('button', { class: 'btn btn-outline btn-block', disabled: true, html: `${svg('clock', 18)} Richiesta inviata` }));
+    return card;
+  }
+  if (inc) {
+    const btn = el('button', { class: 'btn btn-primary btn-block', html: `${svg('check', 18)} Accetta richiesta` });
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try { await api.post(`/friends/${inc.id}/accept`); toast.success('Ora siete amici!'); setTimeout(() => location.reload(), 500); }
+      catch (e) { toast.error(e.message || 'Operazione non riuscita.'); btn.disabled = false; }
+    });
+    card.append(btn);
+    return card;
+  }
+  const btn = el('button', { class: 'btn btn-primary btn-block', html: `${svg('users', 18)} Aggiungi amico` });
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.innerHTML = 'Invio…';
+    try {
+      await api.post('/friends/request', { user_id: Number(targetId) });
+      btn.className = 'btn btn-outline btn-block'; btn.disabled = true;
+      btn.innerHTML = `${svg('clock', 18)} Richiesta inviata`;
+      toast.success('Richiesta di amicizia inviata!');
+    } catch (e) {
+      toast.error(e.message || 'Operazione non riuscita.');
+      btn.disabled = false; btn.innerHTML = `${svg('users', 18)} Aggiungi amico`;
+    }
+  });
+  card.append(btn);
+  return card;
 }
 
 /* -------------------- Intestazione -------------------- */
@@ -99,7 +150,7 @@ function headerCard(user, isOwn) {
         el('div', { class: 'text-accent', style: 'font-weight:600', text: user.title || levelTitle(level) }),
         el('div', { class: 'flex gap-2 wrap mt-1' }, [
           el('span', { class: 'pill accent', text: `Liv. ${level}` }),
-          user.streak_days ? el('span', { class: 'pill gray', text: `🔥 ${user.streak_days}` }) : null,
+          user.streak_days ? el('span', { class: 'pill gray', html: `${svg('fire', 14)} ${user.streak_days}` }) : null,
         ]),
       ]),
     ]),
@@ -126,15 +177,15 @@ function actionsCard() {
   return el('div', { class: 'card', style: 'margin-top:var(--sp-3)' }, [
     el('div', { class: 'grid grid-2' }, [
       el('button', { class: 'btn btn-outline', html: `${svg('edit', 20)} Modifica profilo`, onClick: () => openEditModal() }),
-      el('button', { class: 'btn btn-outline', text: 'Cambia password', onClick: openPasswordModal }),
+      el('button', { class: 'btn btn-outline', html: `${svg('key', 20)} Password`, onClick: openPasswordModal }),
     ]),
-    el('div', { class: 'flex gap-2 wrap', style: 'margin-top:var(--sp-3)' }, [
-      el('a', { class: 'chip', href: '/settings.html', html: `${svg('settings', 18)} Impostazioni` }),
-      el('a', { class: 'chip', href: '/friends.html', html: `${svg('users', 18)} Amici` }),
-      el('a', { class: 'chip', href: '/clubs.html', text: '👥 Club' }),
+    el('div', { class: 'profile-nav', style: 'margin-top:var(--sp-3)' }, [
+      el('a', { class: 'btn btn-outline', href: '/settings.html', html: `${svg('settings', 22)}<span>Impostazioni</span>` }),
+      el('a', { class: 'btn btn-outline', href: '/friends.html', html: `${svg('users', 22)}<span>Amici</span>` }),
+      el('a', { class: 'btn btn-outline', href: '/clubs.html', html: `${svg('building', 22)}<span>Club</span>` }),
     ]),
     el('div', { style: 'margin-top:var(--sp-3)' }, [
-      el('button', { class: 'btn btn-ghost btn-block', html: `${svg('logout', 20)} Esci`, onClick: () => auth.logout() }),
+      el('button', { class: 'btn btn-logout btn-block', html: `${svg('logout', 20)} Esci`, onClick: () => auth.logout() }),
     ]),
   ]);
 }
@@ -230,16 +281,16 @@ function vehiclesCard(vehicles, isOwn) {
 function renderVehicleList(wrap, vehicles, isOwn) {
   wrap.replaceChildren();
   if (!vehicles.length) {
-    wrap.append(empty('🏍️', isOwn ? 'Nessun veicolo. Aggiungine uno!' : 'Nessun veicolo.'));
+    wrap.append(empty('bike', isOwn ? 'Nessun veicolo. Aggiungine uno!' : 'Nessun veicolo.'));
     return;
   }
   for (const v of vehicles) {
     const sub = [v.make, v.model, v.year].filter(Boolean).join(' · ');
     wrap.append(el('div', { class: 'list-item' }, [
-      el('div', { style: 'font-size:1.6rem', text: vehIcon(v.type) }),
+      el('div', { class: 'text-mid', html: svg(vehIcon(v.type), 26) }),
       el('div', { class: 'li-body' }, [
         el('div', { class: 'li-title' }, [
-          v.name || vehIcon(v.type),
+          v.name || (v.type === 'car' ? 'Auto' : 'Moto'),
           v.is_primary ? el('span', { class: 'pill accent', style: 'margin-left:6px', text: 'Principale' }) : null,
         ]),
         sub ? el('div', { class: 'li-sub', text: sub }) : null,
@@ -265,7 +316,7 @@ function renderVehicleList(wrap, vehicles, isOwn) {
 
 function openVehicleModal(listWrap) {
   const typeSel = el('select', { class: 'select' });
-  for (const t of VEHICLE_TYPES) typeSel.append(el('option', { value: t.v, text: `${t.ic} ${t.l}` }));
+  for (const t of VEHICLE_TYPES) typeSel.append(el('option', { value: t.v, text: t.l }));
   const nameInp = el('input', { class: 'input', maxlength: '60', placeholder: 'es. La mia Panigale' });
   const makeInp = el('input', { class: 'input', maxlength: '40', placeholder: 'Marca' });
   const modelInp = el('input', { class: 'input', maxlength: '40', placeholder: 'Modello' });
@@ -313,14 +364,14 @@ function openVehicleModal(listWrap) {
 function badgesCard(badges, isOwn) {
   const card = el('div', { class: 'card', style: 'margin-top:var(--sp-3)' }, [el('h3', { class: 'card-title', text: 'Distintivi' })]);
   if (!badges.length) {
-    card.append(empty('🏅', 'Nessun distintivo.'));
+    card.append(empty('award', 'Nessun distintivo.'));
     return card;
   }
   const grid = el('div', { class: 'grid grid-auto' });
   for (const b of badges) {
     const earned = isOwn ? !!b.earned : true;
     grid.append(el('div', { class: `gbadge ${tierClass(b.tier)} ${earned ? '' : 'locked'}`, title: b.description || '' }, [
-      el('div', { class: 'ic', text: b.icon || '🏅' }),
+      el('div', { class: 'ic', html: svg(badgeIcon(b.code), 30) }),
       el('div', { class: 'nm', text: b.name || b.code || '' }),
     ]));
   }
@@ -332,7 +383,7 @@ function badgesCard(badges, isOwn) {
 function missionsCard(missions) {
   const card = el('div', { class: 'card', style: 'margin-top:var(--sp-3)' }, [el('h3', { class: 'card-title', text: 'Missioni' })]);
   if (!missions.length) {
-    card.append(empty('🎯', 'Nessuna missione attiva.'));
+    card.append(empty('target', 'Nessuna missione attiva.'));
     return card;
   }
   const groups = [['daily', 'Giornaliere'], ['weekly', 'Settimanali'], ['achievement', 'Obiettivi']];
@@ -352,7 +403,7 @@ function missionRow(m) {
   return el('div', { style: 'margin-bottom:var(--sp-3)' }, [
     el('div', { class: 'flex justify-between items-center gap-2' }, [
       el('div', { style: 'min-width:0' }, [
-        el('div', { class: `li-title ${m.completed ? 'text-success' : ''}`, text: `${m.completed ? '✓ ' : ''}${m.name || ''}` }),
+        el('div', { class: `li-title ${m.completed ? 'text-success' : ''} flex items-center gap-2`, html: `${m.completed ? svg('check', 16) : ''}<span>${(m.name || '').replace(/</g, '&lt;')}</span>` }),
         m.description ? el('div', { class: 'li-sub', text: m.description }) : null,
       ]),
       el('span', { class: 'mono text-lo', style: 'font-size:.8rem;white-space:nowrap', text: `${prog}/${target}` }),

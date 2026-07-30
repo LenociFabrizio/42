@@ -11,10 +11,8 @@ import { createMap, addMarker, viewportBbox } from '../core/map.js';
 import { getCurrentPosition, decodePolyline } from '../core/geo.js';
 import { maybeAutoStart } from '../core/onboarding.js';
 import { $, svg, loader, toast, modal, el, fmtDistance, fmtDuration, debounce } from '../core/ui.js';
+import { catIcon, poiIcon, catLabel } from '../core/constants.js';
 import api from '../core/api.js';
-
-const CAT_ICON = { strada: '🛣️', montagna: '⛰️', panoramico: '🌄', offroad: '🥾', circuito: '🏁', misto: '🧭' };
-const POI_ICON = { benzina: '⛽', officina: '🔧', bar: '☕', panorama: '🌄', curva: '🌀', ritrovo: '📍' };
 
 let map;
 let userMarker = null;
@@ -78,7 +76,7 @@ function syncRoutes(routes) {
   for (const rt of routes) {
     if (markers.routes.has(rt.id)) continue;
     const m = addMarker(map, {
-      lat: rt.start_lat, lng: rt.start_lng, className: 'mk route', html: CAT_ICON[rt.category] || '🧭',
+      lat: rt.start_lat, lng: rt.start_lng, className: 'mk route', html: svg(catIcon(rt.category), 14),
       onClick: () => openRouteSheet(rt),
     });
     markers.routes.set(rt.id, m);
@@ -88,7 +86,7 @@ function syncEvents(events) {
   for (const ev of events) {
     if (markers.events.has(ev.id)) continue;
     const m = addMarker(map, {
-      lat: ev.area_lat, lng: ev.area_lng, className: 'mk event', html: '📣',
+      lat: ev.area_lat, lng: ev.area_lng, className: 'mk event', html: svg('megaphone', 14),
       onClick: () => (location.href = `/event.html?id=${ev.id}`),
     });
     markers.events.set(ev.id, m);
@@ -98,7 +96,7 @@ function syncPois(pois) {
   for (const po of pois) {
     if (markers.pois.has(po.id)) continue;
     const m = addMarker(map, {
-      lat: po.lat, lng: po.lng, className: 'mk poi', html: POI_ICON[po.category] || '📍',
+      lat: po.lat, lng: po.lng, className: 'mk poi', html: svg(poiIcon(po.category), 14),
       popupHtml: `<strong>${po.name}</strong><br><span style="color:#666">${po.description || ''}</span>`,
     });
     markers.pois.set(po.id, m);
@@ -109,7 +107,7 @@ function syncPois(pois) {
 function openRouteSheet(rt) {
   const body = el('div', {}, [
     el('div', { class: 'flex gap-2 wrap mb-3' }, [
-      el('span', { class: 'chip sm', text: `${CAT_ICON[rt.category] || ''} ${rt.category}` }),
+      el('span', { class: 'chip sm', html: `${svg(catIcon(rt.category), 14)} ${catLabel(rt.category)}` }),
       el('span', { class: 'chip sm', text: rt.difficulty }),
     ]),
     rt.description ? el('p', { class: 'text-mid mb-3', text: rt.description }) : null,
