@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#06070a" />
+  <title>Registrati · 4 &amp; | 2</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/variables.css" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/animations.css" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card anim-fade-up">
+      <div class="brand-logo">4 <span class="amp">&amp;</span><span class="sep">|</span> 2</div>
+      <p class="text-lo text-center mb-4">Crea il tuo profilo e parti.</p>
+
+      <form id="register-form" novalidate>
+        <div class="field">
+          <label>Nickname</label>
+          <input class="input" name="nickname" autocomplete="username" placeholder="es. ridley_92" required />
+          <div class="err">3–24 caratteri: lettere, numeri, . _ -</div>
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input class="input" type="email" name="email" autocomplete="email" placeholder="tu@esempio.it" required />
+          <div class="err">Inserisci un'email valida.</div>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input class="input" type="password" name="password" autocomplete="new-password" placeholder="min. 8 caratteri" required />
+          <div class="err">Almeno 8 caratteri.</div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">Crea account</button>
+      </form>
+
+      <p class="text-lo text-center mt-4" style="font-size:.9rem">
+        Hai già un account? <a href="/login.html" style="font-weight:700">Accedi</a>
+      </p>
+    </div>
+  </div>
+  <script type="module" src="/js/pages/register.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#06070a" />
+  <title>Registra · 4 &amp; | 2</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/variables.css" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/animations.css" />
+</head>
+<body>
+  <div id="app-loader"><div class="spinner"></div></div>
+
+  <div class="map-root"><div id="map"></div></div>
+
+  <!-- Barra superiore minimale (uscita) -->
+  <header class="topbar">
+    <a href="/index.html" class="btn-icon btn-ghost" aria-label="Indietro" id="back-btn"></a>
+    <span class="brand-logo" style="font-size:1.05rem" id="rec-title">Nuovo percorso</span>
+    <span class="pill red hidden" id="rec-status"><span class="rec-dot"></span> REC</span>
+  </header>
+
+  <!-- HUD: cruscotto live -->
+  <div class="hud hud-top">
+    <div class="card-glass card-pad speedo">
+      <div class="flex justify-between items-center" style="margin-bottom:6px">
+        <div class="text-left"><div class="num" id="hud-dist" style="font-size:1.4rem">0,0 km</div><div class="k text-lo" style="font-size:.7rem">DISTANZA</div></div>
+        <div class="text-center"><div class="num" id="hud-time" style="font-size:1.4rem">0:00</div><div class="k text-lo" style="font-size:.7rem">TEMPO</div></div>
+        <div class="text-right"><div class="num text-redline" id="hud-max" style="font-size:1.4rem">0</div><div class="k text-lo" style="font-size:.7rem">MAX km/h</div></div>
+      </div>
+      <div class="big num" id="hud-speed">0</div>
+      <div class="u">km/h</div>
+    </div>
+  </div>
+
+  <!-- Controlli in basso (pollice) -->
+  <div class="hud hud-bottom">
+    <div class="flex gap-3 items-center justify-center" style="width:100%">
+      <button id="btn-pause" class="btn btn-outline btn-lg hidden" style="flex:1"></button>
+      <button id="btn-main" class="btn btn-primary btn-lg" style="flex:2"></button>
+    </div>
+  </div>
+
+  <script type="module" src="/js/pages/record.js"></script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+/* =============================================================
+   base.css — Reset, tipografia, elementi base, bottoni, form.
+   ============================================================= */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+* { margin: 0; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-000);
+  color: var(--text-hi);
+  line-height: 1.5;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Numeri e titoli: font tachimetrico. */
+h1, h2, h3, h4, .display, .num {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+}
+.num { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+
+h1 { font-size: clamp(1.8rem, 5vw, 2.6rem); }
+h2 { font-size: clamp(1.4rem, 4vw, 1.9rem); }
+h3 { font-size: 1.2rem; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-strong); }
+
+img { max-width: 100%; display: block; }
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; font-size: 16px; } /* 16px evita lo zoom iOS */
+
+::selection { background: var(--accent); color: #000; }
+
+/* Scrollbar sobria */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-300); border-radius: var(--r-pill); }
+
+/* ---------------- Utility ---------------- */
+.flex { display: flex; }
+.flex-col { display: flex; flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.gap-1 { gap: var(--sp-1); }
+.gap-2 { gap: var(--sp-2); }
+.gap-3 { gap: var(--sp-3); }
+.gap-4 { gap: var(--sp-4); }
+.wrap { flex-wrap: wrap; }
+.grow { flex: 1; }
+.text-center { text-align: center; }
+.text-hi { color: var(--text-hi); }
+.text-mid { color: var(--text-mid); }
+.text-lo { color: var(--text-lo); }
+.text-accent { color: var(--accent); }
+.text-redline { color: var(--redline); }
+.text-success { color: var(--success); }
+.hidden { display: none !important; }
+.mono { font-variant-numeric: tabular-nums; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uppercase { text-transform: uppercase; letter-spacing: 0.06em; }
+.mt-1 { margin-top: var(--sp-1);} .mt-2 { margin-top: var(--sp-2);} .mt-3 { margin-top: var(--sp-3);} .mt-4 { margin-top: var(--sp-4);}
+.mb-2 { margin-bottom: var(--sp-2);} .mb-3 { margin-bottom: var(--sp-3);} .mb-4 { margin-bottom: var(--sp-4);}
+
+/* ---------------- Bottoni ---------------- */
+.btn {
+  --btn-bg: var(--bg-150);
+  --btn-fg: var(--text-hi);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: 12px 20px;
+  min-height: 48px;              /* target touch generoso, uso con una mano */
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-weight: var(--fw-semibold);
+  font-size: 1rem;
+  transition: transform var(--t-fast), background var(--t-fast), box-shadow var(--t-fast), border-color var(--t-fast);
+  user-select: none;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(0.97); }
+.btn svg { width: 20px; height: 20px; }
+
+.btn-primary {
+  --btn-bg: var(--accent);
+  --btn-fg: #120a00;
+  border-color: transparent;
+  box-shadow: var(--sh-accent);
+}
+.btn-primary:hover { --btn-bg: var(--accent-strong); }
+
+.btn-danger { --btn-bg: var(--danger); --btn-fg: #fff; border-color: transparent; }
+.btn-outline { --btn-bg: transparent; }
+.btn-ghost { --btn-bg: transparent; border-color: transparent; color: var(--text-mid); }
+.btn-ghost:hover { color: var(--text-hi); background: var(--bg-100); }
+
+.btn-block { width: 100%; }
+.btn-lg { min-height: 56px; font-size: 1.1rem; padding: 14px 24px; }
+.btn-sm { min-height: 38px; padding: 8px 14px; font-size: 0.9rem; }
+.btn-icon { padding: 0; width: 44px; height: 44px; min-height: 44px; border-radius: var(--r-md); }
+.btn:disabled { opacity: 0.5; pointer-events: none; }
+
+/* ---------------- Form ---------------- */
+.field { margin-bottom: var(--sp-4); }
+.field > label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: var(--fw-semibold);
+  color: var(--text-lo);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.input, .select, .textarea {
+  width: 100%;
+  padding: 13px 14px;
+  min-height: 48px;
+  background: var(--bg-050);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  color: var(--text-hi);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+.input:focus, .select:focus, .textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.input::placeholder, .textarea::placeholder { color: var(--text-dim); }
+.field .err { color: var(--danger); font-size: 0.82rem; margin-top: 5px; display: none; }
+.field.invalid .input, .field.invalid .select { border-color: var(--danger); }
+.field.invalid .err { display: block; }
+
+.checkbox { display: inline-flex; align-items: center; gap: 8px; color: var(--text-mid); cursor: pointer; user-select: none; }
+.checkbox input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+/* Focus visibile per accessibilità (tastiera). */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}

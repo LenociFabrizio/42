@@ -1,0 +1,41 @@
+{
+  "name": "quattro-e-due",
+  "version": "0.1.0",
+  "description": "4 & | 2 — community per chi ama i viaggi su 4 e/o 2 ruote: percorsi, record, eventi, club, live map.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "seed": "node server/database/seed.js",
+    "db:reset": "node server/database/seed.js --reset"
+  },
+  "keywords": [
+    "motorcycle",
+    "car",
+    "routes",
+    "gps",
+    "community",
+    "pwa",
+    "maps"
+  ],
+  "author": "4 & | 2",
+  "license": "MIT",
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "@vercel/blob": "^0.27.3",
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.7.4",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

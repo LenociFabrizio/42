@@ -1,0 +1,15 @@
+node_modules/
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+public/uploads/*
+!public/uploads/.gitkeep
+npm-debug.log*
+.DS_Store
+dist/
+coverage/
+.vercel
+*.log
+server.log

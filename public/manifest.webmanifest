@@ -1,0 +1,22 @@
+{
+  "name": "4 & | 2 — Community su 4 e 2 ruote",
+  "short_name": "4 & | 2",
+  "description": "Percorsi, record, eventi live, club e mappa in tempo reale per motociclisti, automobilisti e viaggiatori.",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#06070a",
+  "theme_color": "#06070a",
+  "lang": "it",
+  "categories": ["sports", "travel", "navigation", "social"],
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Registra percorso", "short_name": "Registra", "url": "/record.html" },
+    { "name": "Eventi", "url": "/events.html" },
+    { "name": "Mappa", "url": "/index.html" }
+  ]
+}

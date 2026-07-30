@@ -1,0 +1,11 @@
+# Normalizza i fine-riga: LF nel repository per tutti i file di testo.
+* text=auto eol=lf
+
+# Binari (nessuna conversione)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.db binary

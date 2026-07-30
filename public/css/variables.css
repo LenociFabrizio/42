@@ -1,0 +1,128 @@
+/* =============================================================
+   variables.css — Design tokens di "4 & | 2"
+   Tema: strumentazione analogica automotive. Nero profondo, altissimo
+   contrasto (leggibile sotto il sole), un solo accento caldo (ambra,
+   la luce dei quadranti) + rosso "redline" per record/allerte.
+   ============================================================= */
+:root {
+  /* ---- Brand / accento (luce strumenti) ---- */
+  --accent: #ffb020;          /* ambra: needle / stati attivi / CREA */
+  --accent-strong: #ff9500;
+  --accent-dim: rgba(255, 176, 32, 0.16);
+  --accent-glow: rgba(255, 176, 32, 0.45);
+
+  /* ---- Redline (record, allerte, velocità massima) ---- */
+  --redline: #ff3b30;
+  --redline-glow: rgba(255, 59, 48, 0.4);
+
+  /* ---- Superfici (dark, leggermente fredde) ---- */
+  --bg-000: #06070a;   /* sfondo pagina / mappa */
+  --bg-050: #0c0e13;   /* sezioni */
+  --bg-100: #12151c;   /* card */
+  --bg-150: #191d26;   /* card elevata / hover */
+  --bg-200: #232935;   /* input / bordi soft */
+  --bg-300: #313848;
+
+  /* ---- Testo (alto contrasto) ---- */
+  --text-hi: #f7f9fc;
+  --text-mid: #b9c0cc;
+  --text-lo: #7c8698;
+  --text-dim: #545d6e;
+
+  /* ---- Stati ---- */
+  --success: #29c46a;
+  --warning: #ffcf33;
+  --danger: #ff3b30;
+  --info: #3da9fc;
+
+  /* ---- Quadrante / gauge ---- */
+  --gauge-track: rgba(255, 255, 255, 0.09);
+  --gauge-tick: rgba(255, 255, 255, 0.28);
+  --gold: #ffd54a;
+  --silver: #cfd6df;
+  --bronze: #d0894f;
+
+  /* ---- Vetro / glass (HUD sulla mappa) ---- */
+  --glass-bg: rgba(12, 14, 19, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-blur: 16px;
+
+  /* ---- Bordi ---- */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* ---- Raggi ---- */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-xl: 26px;
+  --r-pill: 999px;
+
+  /* ---- Ombre ---- */
+  --sh-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --sh-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --sh-lg: 0 20px 55px rgba(0, 0, 0, 0.6);
+  --sh-accent: 0 8px 28px var(--accent-glow);
+
+  /* ---- Spaziatura ---- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+
+  /* ---- Tipografia ---- */
+  /* Rajdhani: tecnico/tachimetrico per numeri e titoli. Inter: testo. */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Rajdhani', 'Inter', system-ui, sans-serif;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* ---- Layout ---- */
+  --topbar-h: 58px;
+  --bottomnav-h: 68px;
+  --container: 1100px;
+  /* Safe area (notch / gesture bar) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* ---- Transizioni ---- */
+  --t-fast: 0.14s ease;
+  --t-med: 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+  --t-slow: 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ---- Z-index ---- */
+  --z-map: 1;
+  --z-hud: 30;
+  --z-bottomnav: 80;
+  --z-topbar: 90;
+  --z-modal: 1000;
+  --z-toast: 1100;
+  --z-loader: 1200;
+}
+
+/* Tema chiaro (opzionale, attivabile da impostazioni con [data-theme="light"]).
+   Manteniamo l'accento; alziamo le superfici. */
+[data-theme='light'] {
+  --bg-000: #eef1f6;
+  --bg-050: #e7ebf2;
+  --bg-100: #ffffff;
+  --bg-150: #f4f6fa;
+  --bg-200: #e2e7ef;
+  --bg-300: #cfd6e0;
+  --text-hi: #0d1117;
+  --text-mid: #33404f;
+  --text-lo: #5b6875;
+  --text-dim: #8a95a3;
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.18);
+  --gauge-track: rgba(0, 0, 0, 0.1);
+  --gauge-tick: rgba(0, 0, 0, 0.3);
+}
