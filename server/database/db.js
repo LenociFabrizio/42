@@ -97,6 +97,10 @@ export async function initSchema() {
   const schema = fs.readFileSync(schemaPath, 'utf-8');
   await db.exec(schema);
   await runMigrations();
+  // Popola il catalogo gamification (badge/missioni) se assente: così anche un
+  // DB nuovo in produzione è subito funzionale, senza seed manuale.
+  const { ensureCatalog } = await import('./catalog.js');
+  await ensureCatalog(db);
 }
 
 /**
