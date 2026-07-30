@@ -10,7 +10,6 @@ import { registerPWA } from '../core/pwa.js';
 import { createMap, addMarker, viewportBbox } from '../core/map.js';
 import { getCurrentPosition, decodePolyline } from '../core/geo.js';
 import { $, svg, loader, toast, modal, el, fmtDistance, fmtDuration, debounce } from '../core/ui.js';
-import { LIVE_ENABLED_TIP } from '../core/constants.js';
 import api from '../core/api.js';
 
 const CAT_ICON = { strada: '🛣️', montagna: '⛰️', panoramico: '🌄', offroad: '🥾', circuito: '🏁', misto: '🧭' };
@@ -121,13 +120,9 @@ function openRouteSheet(rt) {
 }
 const stat = (v, k) => el('div', { class: 'stat' }, [el('div', { class: 'v', text: v }), el('div', { class: 'k', text: k })]);
 
-/** Attiva/disattiva il livello "amici live" (richiede livello sbloccato). */
+/** Attiva/disattiva il livello "live": mostra amici (sempre) e sconosciuti public. */
 async function toggleLive() {
   const fab = $('#fab-live');
-  if ((auth.user?.level || 1) < 5) {
-    toast.info(LIVE_ENABLED_TIP);
-    return;
-  }
   liveOn = !liveOn;
   fab.classList.toggle('active', liveOn);
   if (!liveOn) {

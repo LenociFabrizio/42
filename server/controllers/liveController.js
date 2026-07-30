@@ -16,16 +16,15 @@ import { LIVE_MAP_MIN_LEVEL } from '../utils/constants.js';
 
 /**
  * PUT /api/live/settings — attiva/disattiva la condivisione live.
- * Per ATTIVARE serve il livello minimo (progressione anti-spam).
+ * NESSUN livello minimo per attivare: la condivisione con gli AMICI è sempre
+ * disponibile (con consenso esplicito). Il livello minimo conta solo per
+ * essere visibili agli SCONOSCIUTI (visibilità 'public'), vedi `nearby`.
  * Disattivando, la posizione più recente viene cancellata.
  */
 export const setLive = asyncHandler(async (req, res) => {
   const enabled = v.bool(req.body.live_enabled);
 
   if (enabled) {
-    if ((req.user.level || 1) < LIVE_MAP_MIN_LEVEL) {
-      throw new HttpError(403, `Live Map sbloccata dal livello ${LIVE_MAP_MIN_LEVEL}.`);
-    }
     await db
       .prepare("UPDATE users SET live_enabled = 1, updated_at = datetime('now') WHERE id = ?")
       .run(req.user.id);
@@ -81,12 +80,13 @@ export const stop = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/live/nearby — utenti live visibili al richiedente.
- * "recent" = last_seen negli ultimi 5 minuti. Vengono inclusi solo gli
- * utenti con live_enabled = 1, escluso me stesso, rispettando la privacy
- * di posizione di OGNI utente target:
- *   - 'public'  → visibile a chiunque
- *   - 'friends' → visibile solo se amicizia accettata con me
- *   - 'private' → mai
+ * "recent" = last_seen negli ultimi 5 minuti. Solo utenti con live_enabled = 1,
+ * escluso me stesso. Regole di visibilità (con consenso già garantito da
+ * live_enabled):
+ *   - AMICO (amicizia accettata): visibile SEMPRE, senza livello minimo,
+ *     purché la sua visibilità non sia 'private'.
+ *   - SCONOSCIUTO (non amico): visibile SOLO se la sua visibilità è 'public'
+ *     E il suo livello è >= LIVE_MAP_MIN_LEVEL.
  * Filtro opzionale bbox = "minLng,minLat,maxLng,maxLat".
  */
 export const nearby = asyncHandler(async (req, res) => {
@@ -107,22 +107,29 @@ export const nearby = asyncHandler(async (req, res) => {
     }
   }
 
-  // Privacy di posizione del target (default schema = 'friends' se manca la riga).
+  // Sottoquery amicizia accettata tra il target (u) e me.
+  const FRIEND = `EXISTS (
+    SELECT 1 FROM friendships f
+     WHERE f.status = 'accepted'
+       AND ((f.requester_id = u.id AND f.addressee_id = ?)
+         OR (f.requester_id = ? AND f.addressee_id = u.id))
+  )`;
+
   where.push(
     `(
-       COALESCE(us.location_visibility, 'friends') = 'public'
+       (
+         COALESCE(us.location_visibility, 'friends') IN ('friends', 'public')
+         AND ${FRIEND}
+       )
        OR (
-         COALESCE(us.location_visibility, 'friends') = 'friends'
-         AND EXISTS (
-           SELECT 1 FROM friendships f
-            WHERE f.status = 'accepted'
-              AND ((f.requester_id = u.id AND f.addressee_id = ?)
-                OR (f.requester_id = ? AND f.addressee_id = u.id))
-         )
+         COALESCE(us.location_visibility, 'friends') = 'public'
+         AND u.level >= ?
+         AND NOT ${FRIEND}
        )
      )`
   );
-  args.push(req.user.id, req.user.id);
+  // Ordine dei parametri: friend(amico) x2, poi livello, poi friend(sconosciuto) x2.
+  args.push(req.user.id, req.user.id, LIVE_MAP_MIN_LEVEL, req.user.id, req.user.id);
 
   const rows = await db
     .prepare(

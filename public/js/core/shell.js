@@ -6,6 +6,7 @@
 import { el, svg, modal } from './ui.js';
 import { auth } from './auth.js';
 import { ringPercent } from './gamification.js';
+import { initConsent } from './consent.js';
 import api from './api.js';
 
 const NAV = [
@@ -93,6 +94,9 @@ export function mountShell({ active = '', hideNav = false } = {}) {
   const { bar, bellDot } = buildTopbar();
   document.body.prepend(bar);
   if (!hideNav) document.body.append(buildBottomNav(active));
+
+  // Banner informativo privacy/cookie (una volta).
+  initConsent();
 
   // Polling notifiche (leggero): all'avvio e ogni 30s, e al ritorno in foreground.
   pollUnread(bellDot);

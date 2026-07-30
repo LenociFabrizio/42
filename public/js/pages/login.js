@@ -2,8 +2,10 @@
 import '../core/theme.js';
 import { auth } from '../core/auth.js';
 import { $, toast, qs } from '../core/ui.js';
+import { initConsent } from '../core/consent.js';
 
 if (auth.isLogged()) location.href = qs.get('next') || '/index.html';
+initConsent();
 
 const form = $('#login-form');
 form.addEventListener('submit', async (e) => {

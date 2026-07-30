@@ -3,7 +3,7 @@
    soglie, opzioni). Devono restare coerenti con quelle del server.
    ============================================================= */
 export const LIVE_MAP_MIN_LEVEL = 5;
-export const LIVE_ENABLED_TIP = `La Live Map con gli amici si sblocca al livello ${LIVE_MAP_MIN_LEVEL}. Continua a macinare km!`;
+export const LIVE_ENABLED_TIP = `La posizione live con gli amici è sempre disponibile (con consenso). Per essere visibile agli sconosciuti (visibilità "pubblica") serve il livello ${LIVE_MAP_MIN_LEVEL}.`;
 
 export const ROUTE_CATEGORIES = [
   { v: 'strada', l: 'Strada', ic: '🛣️' },

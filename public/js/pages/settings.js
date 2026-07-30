@@ -58,6 +58,7 @@ function build(root, s, me) {
     liveCard(me),
     notifyCard(s),
     accountCard(),
+    el('div', { class: 'legal-footer', html: '<a href="/privacy.html">Privacy</a><a href="/cookie.html">Cookie</a><a href="/terms.html">Termini</a>' }),
   );
 }
 
@@ -142,10 +143,10 @@ function liveCard(me) {
       toast.error(err.message || 'Operazione non riuscita.');
     }
   });
-  const toggle = el('label', { class: 'checkbox', style: 'padding:6px 0' }, [chk, el('span', { text: 'Condividi la mia posizione con gli amici' })]);
+  const toggle = el('label', { class: 'checkbox', style: 'padding:6px 0' }, [chk, el('span', { text: 'Condividi la mia posizione live' })]);
   return card('Live Map', [
     toggle,
-    el('div', { class: 'text-lo', style: 'font-size:.78rem;margin-top:6px', text: `La condivisione live con gli amici richiede il livello ${LIVE_MAP_MIN_LEVEL}.` }),
+    el('div', { class: 'text-lo', style: 'font-size:.78rem;margin-top:6px', text: `La condivisione con gli amici è sempre disponibile. Per essere visibile anche agli sconosciuti imposta "Visibilità posizione" su "Pubblico": accadrà solo dal livello ${LIVE_MAP_MIN_LEVEL}.` }),
   ]);
 }
 

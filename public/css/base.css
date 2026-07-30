@@ -104,7 +104,6 @@ input, select, textarea { font-family: inherit; font-size: 16px; } /* 16px evita
   --btn-bg: var(--accent);
   --btn-fg: #120a00;
   border-color: transparent;
-  box-shadow: var(--sh-accent);
 }
 .btn-primary:hover { --btn-bg: var(--accent-strong); }
 

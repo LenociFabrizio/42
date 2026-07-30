@@ -13,3 +13,6 @@ coverage/
 .vercel
 *.log
 server.log
+
+.vercel
+.env*

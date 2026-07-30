@@ -38,12 +38,19 @@
           <input class="input" type="password" name="password" autocomplete="new-password" placeholder="min. 8 caratteri" required />
           <div class="err">Almeno 8 caratteri.</div>
         </div>
+        <label class="checkbox" style="align-items:flex-start;gap:10px;margin-bottom:16px;font-size:.86rem">
+          <input type="checkbox" name="consent" />
+          <span>Ho letto e accetto la <a href="/privacy.html" target="_blank">Privacy Policy</a> e i <a href="/terms.html" target="_blank">Termini di Servizio</a>.</span>
+        </label>
         <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">Crea account</button>
       </form>
 
       <p class="text-lo text-center mt-4" style="font-size:.9rem">
         Hai già un account? <a href="/login.html" style="font-weight:700">Accedi</a>
       </p>
+      <div class="legal-footer">
+        <a href="/privacy.html">Privacy</a><a href="/cookie.html">Cookie</a><a href="/terms.html">Termini</a>
+      </div>
     </div>
   </div>
   <script type="module" src="/js/pages/register.js"></script>

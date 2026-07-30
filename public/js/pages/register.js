@@ -2,8 +2,10 @@
 import '../core/theme.js';
 import { auth } from '../core/auth.js';
 import { $, toast } from '../core/ui.js';
+import { initConsent } from '../core/consent.js';
 
 if (auth.isLogged()) location.href = '/index.html';
+initConsent();
 
 const form = $('#register-form');
 form.addEventListener('submit', async (e) => {
@@ -16,6 +18,7 @@ form.addEventListener('submit', async (e) => {
   if (nickname.length < 3 || !/^[a-zA-Z0-9._-]+$/.test(nickname)) { toast.error('Nickname non valido (3–24, lettere/numeri/._-).'); return; }
   if (!email) { toast.error('Inserisci un\'email valida.'); return; }
   if (password.length < 8) { toast.error('La password deve avere almeno 8 caratteri.'); return; }
+  if (!form.consent.checked) { toast.error('Devi accettare Privacy Policy e Termini per registrarti.'); return; }
 
   btn.disabled = true;
   const original = btn.textContent;

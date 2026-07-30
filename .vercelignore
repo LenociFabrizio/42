@@ -1,0 +1,9 @@
+node_modules
+.git
+.env
+*.log
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+public/uploads
