@@ -12,6 +12,7 @@ import { registerPWA } from '../core/pwa.js';
 import { $, el, svg, loader, toast, modal, confirmDialog, debounce } from '../core/ui.js';
 import { LIVE_MAP_MIN_LEVEL } from '../core/constants.js';
 import { startTutorial } from '../core/onboarding.js';
+import { bgEnabled, setBgEnabled } from '../core/tracking.js';
 import api, { token } from '../core/api.js';
 
 const VIS = [
@@ -57,11 +58,26 @@ function build(root, s, me) {
     appearanceCard(s),
     privacyCard(s),
     liveCard(me),
+    trackingCard(),
     notifyCard(s),
     guideCard(),
     accountCard(),
     el('div', { class: 'legal-footer', html: '<a href="/privacy.html">Privacy</a><a href="/cookie.html">Cookie</a><a href="/terms.html">Termini</a>' }),
   );
+}
+
+/* -------------------- Tracciamento in background -------------------- */
+function trackingCard() {
+  const chk = el('input', { type: 'checkbox' });
+  chk.checked = bgEnabled();
+  chk.addEventListener('change', () => {
+    setBgEnabled(chk.checked);
+    toast.success(chk.checked ? 'Tracciamento in background attivo' : 'Tracciamento in background disattivato', { duration: 1500 });
+  });
+  return card('Tracciamento', [
+    el('label', { class: 'checkbox', style: 'padding:6px 0' }, [chk, el('span', { text: 'Continua a tracciare in background' })]),
+    el('div', { class: 'text-lo', style: 'font-size:.78rem;margin-top:6px', text: "Durante la registrazione di un percorso e in modalità Solo Mappa mostra una notifica e mantiene l'app attiva (Wake Lock). Nota: per limiti dei browser, con schermo spento o app chiusa il tracciamento web può interrompersi — solo un'app nativa traccia sempre in background." }),
+  ]);
 }
 
 /* -------------------- Guida / Tutorial -------------------- */

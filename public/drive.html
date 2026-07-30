@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#06070a" />
+  <title>Solo Mappa · 4 &amp; | 2</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/variables.css" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/animations.css" />
+</head>
+<body>
+  <div id="app-loader"><div class="spinner"></div></div>
+
+  <div class="map-root"><div id="map"></div></div>
+
+  <!-- HUD minimappa -->
+  <div class="drive-vignette"></div>
+
+  <div class="drive-player">
+    <span class="drive-arrow">
+      <svg viewBox="0 0 24 24" width="44" height="44" fill="none">
+        <path d="M12 2 4.5 21 12 17.4 19.5 21 12 2Z" fill="#ffb020" stroke="#120a00" stroke-width="1.3" stroke-linejoin="round" />
+      </svg>
+    </span>
+  </div>
+
+  <div class="drive-top">
+    <button id="compass" class="drive-compass" aria-label="Bussola / orientamento" title="Nord in alto / Direzione in alto">
+      <span class="n">N</span>
+      <span class="needle" id="needle"></span>
+    </button>
+  </div>
+
+  <div class="drive-speed">
+    <div class="big" id="spd">0</div>
+    <div class="u">km/h</div>
+  </div>
+
+  <button id="exit" class="map-fab drive-ctrl exit" aria-label="Esci"></button>
+  <button id="recenter" class="map-fab drive-ctrl recenter" aria-label="Ricentra"></button>
+
+  <script type="module" src="/js/pages/drive.js"></script>
+</body>
+</html>

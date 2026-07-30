@@ -12,12 +12,14 @@ import { createMap, setRouteLine, addMarker } from '../core/map.js';
 import { GpsTracker, getCurrentPosition } from '../core/geo.js';
 import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, ROUTE_VEHICLE_TYPES } from '../core/constants.js';
 import { $, svg, el, loader, toast, modal, confirmDialog, fmtDistance, fmtDuration, fmtChrono, qs } from '../core/ui.js';
+import { TrackingSession } from '../core/tracking.js';
 import api from '../core/api.js';
 
 const routeId = qs.get('route'); // se presente → modalità COMPLETA
 const isComplete = !!routeId;
 
 let map, tracker, userMarker;
+let session = null; // sessione di tracciamento (wake lock + notifica background)
 let state = 'idle'; // idle | recording | paused | done
 let hudTimer = null;
 const live = []; // [[lat,lng], ...]
@@ -68,6 +70,8 @@ function startRec() {
     onError: () => toast.error('GPS non disponibile. Attiva la posizione ad alta precisione.'),
   });
   tracker.start();
+  session = new TrackingSession({ label: 'Registrazione percorso in corso: la tua posizione è in uso.' });
+  session.start();
   state = 'recording';
   $('#rec-status').classList.remove('hidden');
   $('#btn-pause').classList.remove('hidden');
@@ -91,6 +95,7 @@ async function stopRec() {
   const ok = await confirmDialog({ title: 'Terminare la registrazione?', message: 'Salverai il tracciato registrato.', confirmText: 'Termina' });
   if (!ok) return;
   const result = tracker.stop();
+  session?.stop();
   state = 'done';
   $('#rec-status').classList.add('hidden');
   clearInterval(hudTimer);

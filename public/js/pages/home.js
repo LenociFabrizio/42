@@ -8,7 +8,7 @@ import { guard, auth } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
 import { createMap, addMarker, viewportBbox } from '../core/map.js';
-import { getCurrentPosition, decodePolyline } from '../core/geo.js';
+import { getCurrentPosition, decodePolyline, haversine } from '../core/geo.js';
 import { maybeAutoStart } from '../core/onboarding.js';
 import { $, svg, loader, toast, modal, el, fmtDistance, fmtDuration, debounce } from '../core/ui.js';
 import { catIcon, poiIcon, catLabel } from '../core/constants.js';
@@ -17,7 +17,14 @@ import api from '../core/api.js';
 let map;
 let userMarker = null;
 let liveOn = false;
+let watchId = null;
 const markers = { routes: new Map(), events: new Map(), pois: new Map(), live: new Map() };
+// Dati correnti (per il rilevamento di prossimità) + stato del prompt.
+let dataRoutes = [];
+let dataEvents = [];
+const proxDismissed = new Set();
+let proxCurrent = null;
+let proxEl = null;
 
 async function main() {
   const user = await guard();
@@ -27,6 +34,7 @@ async function main() {
 
   $('#fab-locate').innerHTML = svg('crosshair', 22);
   $('#fab-live').innerHTML = svg('users', 22);
+  $('#fab-drive').innerHTML = svg('navigation', 22);
 
   map = await createMap('map');
   loader.hide();
@@ -37,11 +45,28 @@ async function main() {
   map.on('load', () => {
     locate(false);
     reload();
+    startWatch();
   });
   map.on('moveend', debounce(reload, 400));
 
   $('#fab-locate').addEventListener('click', () => locate(true));
   $('#fab-live').addEventListener('click', toggleLive);
+  $('#fab-drive').addEventListener('click', () => (location.href = '/drive.html'));
+}
+
+/** Segue la posizione (aggiorna il marker "tu") e valuta la prossimità. */
+function startWatch() {
+  if (!('geolocation' in navigator) || watchId != null) return;
+  watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const lat = pos.coords.latitude, lng = pos.coords.longitude;
+      if (userMarker) userMarker.setLngLat([lng, lat]);
+      else userMarker = addMarker(map, { lat, lng, className: 'mk-user pulse' });
+      checkProximity(lat, lng);
+    },
+    () => {},
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
 }
 
 /** Centra sulla posizione dell'utente e mostra il marker "tu". */
@@ -66,8 +91,10 @@ const reload = async () => {
       api.get('/events', { status: 'scheduled' }),
       api.get('/pois', { bbox }),
     ]);
-    syncRoutes(r.routes || []);
-    syncEvents(e.events || []);
+    dataRoutes = r.routes || [];
+    dataEvents = e.events || [];
+    syncRoutes(dataRoutes);
+    syncEvents(dataEvents);
     syncPois(p.pois || []);
   } catch { /* offline: silenzioso */ }
 };
@@ -153,6 +180,86 @@ async function refreshLive() {
     // Rimuovi chi non è più live.
     for (const [id, m] of markers.live) if (!seen.has(id)) { m.remove(); markers.live.delete(id); }
   } catch { /* silenzioso */ }
+}
+
+/* ============================================================
+ *  PROSSIMITÀ — quando ti avvicini a un percorso o a un evento,
+ *  compare un prompt animato per partecipare (Sì/No). Se ti allontani
+ *  il prompt sparisce e l'app torna com'era. Isteresi enter/exit per
+ *  evitare che appaia e sparisca di continuo.
+ * ============================================================ */
+function checkProximity(lat, lng) {
+  const candidates = [];
+
+  for (const ev of dataEvents) {
+    if (ev.status === 'ended' || ev.status === 'cancelled') continue;
+    const enter = Math.min(ev.radius_m || 500, 1000);
+    const exit = enter + 250;
+    const d = haversine(lat, lng, ev.area_lat, ev.area_lng);
+    const key = `e${ev.id}`;
+    if (d > exit) { proxDismissed.delete(key); if (proxCurrent === key) hideProx(); continue; }
+    if (d <= enter && !proxDismissed.has(key)) candidates.push({ key, type: 'event', item: ev, d });
+  }
+  for (const rt of dataRoutes) {
+    const enter = 150, exit = 400;
+    const d = haversine(lat, lng, rt.start_lat, rt.start_lng);
+    const key = `r${rt.id}`;
+    if (d > exit) { proxDismissed.delete(key); if (proxCurrent === key) hideProx(); continue; }
+    if (d <= enter && !proxDismissed.has(key)) candidates.push({ key, type: 'route', item: rt, d });
+  }
+
+  if (proxCurrent) return; // un prompt alla volta: resta finché non ci si allontana/risponde
+  if (!candidates.length) return;
+  candidates.sort((a, b) => a.d - b.d);
+  showProx(candidates[0], lat, lng);
+}
+
+function showProx(cand, lat, lng) {
+  hideProx(true);
+  proxCurrent = cand.key;
+  const isEvent = cand.type === 'event';
+  const name = cand.item.name || (isEvent ? 'evento' : 'percorso');
+
+  const yes = el('button', { class: 'btn btn-primary', text: 'Sì' });
+  const no = el('button', { class: 'btn btn-outline', text: 'No, grazie' });
+  proxEl = el('div', { class: 'prox-prompt' }, [
+    el('div', { class: 'prox-head' }, [
+      el('div', { class: 'prox-ic', html: svg(isEvent ? 'megaphone' : 'flag', 24) }),
+      el('div', { style: 'min-width:0' }, [
+        el('div', { class: 'prox-title', text: isEvent ? `Sei al ritrovo di «${name}»` : `Sei all'inizio di «${name}»` }),
+        el('div', { class: 'prox-sub', text: isEvent ? 'Vuoi partecipare e fare il check-in?' : 'Vuoi registrare un tentativo su questo percorso?' }),
+      ]),
+    ]),
+    el('div', { class: 'prox-actions' }, [no, yes]),
+  ]);
+  document.body.append(proxEl);
+
+  no.addEventListener('click', () => { proxDismissed.add(cand.key); hideProx(); });
+  yes.addEventListener('click', async () => {
+    if (isEvent) {
+      yes.disabled = true; yes.textContent = 'Check-in…';
+      try {
+        const res = await api.post(`/events/${cand.item.id}/checkin`, { lat, lng });
+        toast.success('Sei presente all\'evento! ✅');
+        proxDismissed.add(cand.key);
+        hideProx();
+      } catch (err) {
+        toast.error(err.message || 'Check-in non riuscito.');
+        yes.disabled = false; yes.textContent = 'Sì';
+      }
+    } else {
+      location.href = `/record.html?route=${cand.item.id}`;
+    }
+  });
+}
+
+function hideProx(immediate = false) {
+  const node = proxEl;
+  proxEl = null; proxCurrent = null;
+  if (!node) return;
+  if (immediate) { node.remove(); return; }
+  node.classList.add('leaving');
+  setTimeout(() => node.remove(), 260);
 }
 
 const home = {};

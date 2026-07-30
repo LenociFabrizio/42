@@ -6,7 +6,7 @@
      - Statici same-origin (css/js/img/font): stale-while-revalidate.
      - Cross-origin (tiles mappa, CDN): passthrough (rete).
    ============================================================= */
-const VERSION = 'v5';
+const VERSION = 'v6';
 const CACHE = `4e2-${VERSION}`;
 const CORE = [
   '/',
@@ -77,3 +77,13 @@ function cachePut(request, response) {
   if (!response || response.status !== 200 || response.type === 'opaque') return;
   caches.open(CACHE).then((c) => c.put(request, response)).catch(() => {});
 }
+
+// Click sulla notifica (es. "tracciamento attivo"): porta in primo piano l'app.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of all) { if ('focus' in c) return c.focus(); }
+    if (self.clients.openWindow) return self.clients.openWindow('/index.html');
+  })());
+});
