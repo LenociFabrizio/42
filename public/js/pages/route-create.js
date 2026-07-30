@@ -111,12 +111,19 @@ function straightDistance() {
 function updateStats(dist, road, loading) {
   $('#pt-count').textContent = waypoints.length;
   $('#pt-dist').textContent = fmtDistance(dist);
+
   const badge = $('#road-badge');
-  if (loading) { badge.textContent = 'calcolo su strada…'; badge.className = 'pill gray'; }
-  else if (road) { badge.textContent = 'su strada'; badge.className = 'pill green'; }
-  else if (waypoints.length >= 2) { badge.textContent = 'linea diretta'; badge.className = 'pill gray'; }
-  else { badge.textContent = ''; badge.className = 'pill gray'; badge.style.display = waypoints.length >= 2 ? '' : 'none'; }
-  if (waypoints.length >= 2) badge.style.display = '';
+  if (badge) {
+    const hasRoute = waypoints.length >= 2;
+    if (!hasRoute) { badge.textContent = ''; badge.style.display = 'none'; }
+    else {
+      badge.style.display = '';
+      if (loading) { badge.textContent = 'calcolo su strada…'; badge.className = 'pill gray'; }
+      else if (road) { badge.textContent = 'su strada'; badge.className = 'pill green'; }
+      else { badge.textContent = 'linea diretta'; badge.className = 'pill gray'; }
+    }
+  }
+
   $('#btn-undo').disabled = waypoints.length === 0;
   $('#btn-continue').disabled = waypoints.length < 2;
 }
