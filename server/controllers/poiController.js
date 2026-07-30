@@ -9,6 +9,7 @@ import db from '../database/db.js';
 import { asyncHandler, HttpError } from '../utils/helpers.js';
 import * as v from '../utils/validate.js';
 import { XP } from '../utils/constants.js';
+import { isInItaly } from '../utils/geo.js';
 import { awardXp, checkBadges } from '../services/gamification.js';
 
 // Categorie ammesse per i POI (vedi schema.sql: pois.category).
@@ -50,6 +51,9 @@ export const create = asyncHandler(async (req, res) => {
   const category = v.oneOf(req.body.category, POI_CATEGORIES, 'Categoria', { def: 'panorama' });
   const lat = v.latitude(req.body.lat);
   const lng = v.longitude(req.body.lng);
+  if (!isInItaly(lat, lng)) {
+    throw new HttpError(400, 'La WebApp è disponibile solo per il territorio italiano: il punto deve trovarsi in Italia.');
+  }
 
   const info = await db
     .prepare('INSERT INTO pois (creator_id, name, description, category, lat, lng) VALUES (?, ?, ?, ?, ?, ?)')

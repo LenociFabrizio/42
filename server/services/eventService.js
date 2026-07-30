@@ -56,8 +56,8 @@ export async function createEvent(userId, input) {
     .prepare(
       `INSERT INTO events
          (creator_id, name, description, photo, starts_at, duration_min, max_participants,
-          route_id, area_lat, area_lng, area_name, radius_m, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')`
+          route_id, area_lat, area_lng, area_name, radius_m, status, privacy, club_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?)`
     )
     .run(
       userId,
@@ -71,7 +71,9 @@ export async function createEvent(userId, input) {
       input.area_lat,
       input.area_lng,
       input.area_name || '',
-      input.radius_m
+      input.radius_m,
+      input.privacy || 'public',
+      input.club_id || null
     );
   const eventId = info.lastInsertRowid;
 

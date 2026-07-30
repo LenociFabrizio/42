@@ -8,13 +8,15 @@
 import db from '../database/db.js';
 import { asyncHandler, HttpError, safeJson, publicUser } from '../utils/helpers.js';
 import * as v from '../utils/validate.js';
-import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, ROUTE_VEHICLE_TYPES, PRIVACY } from '../utils/constants.js';
+import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, ROUTE_VEHICLE_TYPES, ROUTE_PRIVACY } from '../utils/constants.js';
 import { persistUpload } from '../middleware/upload.js';
+import { isInItaly } from '../utils/geo.js';
 import { createRoute, submitCompletion } from '../services/routeService.js';
+import { isClubAdmin, isClubMember } from '../services/clubAccess.js';
 
 /** Proiezione "card" di un percorso per liste/mappa. */
 const CARD_COLS =
-  'id, creator_id, name, description, photo, category, difficulty, vehicle_type, distance_m, elevation_gain_m, est_time_s, start_lat, start_lng, end_lat, end_lng, privacy, completions_count, likes_count, created_at';
+  'id, creator_id, name, description, photo, category, difficulty, vehicle_type, distance_m, elevation_gain_m, est_time_s, start_lat, start_lng, end_lat, end_lng, privacy, club_id, completions_count, likes_count, created_at';
 
 /**
  * GET /api/routes — lista/ricerca. Filtri: bbox, category, difficulty, q, mine.
@@ -24,10 +26,12 @@ export const list = asyncHandler(async (req, res) => {
   const where = [];
   const args = [];
 
-  // Visibilità: pubblici a tutti; privati solo al proprietario.
+  // Visibilità: pubblici a tutti; privati solo al proprietario; "club" ai membri.
   if (req.user) {
-    where.push("(privacy = 'public' OR creator_id = ?)");
-    args.push(req.user.id);
+    where.push(
+      "(privacy = 'public' OR creator_id = ? OR (privacy = 'club' AND club_id IN (SELECT club_id FROM club_members WHERE user_id = ?)))"
+    );
+    args.push(req.user.id, req.user.id);
   } else {
     where.push("privacy = 'public'");
   }
@@ -69,6 +73,10 @@ export const getOne = asyncHandler(async (req, res) => {
   if (!route) throw new HttpError(404, 'Percorso non trovato.');
   if (route.privacy === 'private' && route.creator_id !== req.user?.id) {
     throw new HttpError(403, 'Percorso privato.');
+  }
+  if (route.privacy === 'club' && route.creator_id !== req.user?.id) {
+    const ok = req.user ? await isClubMember(route.club_id, req.user.id) : false;
+    if (!ok) throw new HttpError(403, 'Percorso riservato ai membri del club.');
   }
 
   const creator = await db.prepare('SELECT id, nickname, avatar, level FROM users WHERE id = ?').get(route.creator_id);
@@ -124,12 +132,26 @@ export const create = asyncHandler(async (req, res) => {
     category: v.oneOf(req.body.category, ROUTE_CATEGORIES, 'Categoria', { def: 'misto' }),
     difficulty: v.oneOf(req.body.difficulty, ROUTE_DIFFICULTIES, 'Difficoltà', { def: 'media' }),
     vehicle_type: v.oneOf(req.body.vehicle_type, ROUTE_VEHICLE_TYPES, 'Tipo veicolo', { def: 'both' }),
-    privacy: v.oneOf(req.body.privacy, PRIVACY, 'Privacy', { def: 'public' }),
+    privacy: v.oneOf(req.body.privacy, ROUTE_PRIVACY, 'Privacy', { def: 'public' }),
     start_name: v.optStr(req.body.start_name, 'Partenza', { max: 120 }),
     end_name: v.optStr(req.body.end_name, 'Arrivo', { max: 120 }),
     tags: Array.isArray(req.body.tags) ? req.body.tags : [],
     track: v.track(req.body.track, 'Tracciato'),
   };
+  // Solo territorio italiano: partenza e arrivo devono essere in Italia.
+  const t0 = input.track[0], t1 = input.track[input.track.length - 1];
+  if (!isInItaly(t0.lat, t0.lng) || !isInItaly(t1.lat, t1.lng)) {
+    throw new HttpError(400, 'La WebApp è disponibile solo per il territorio italiano: il percorso deve trovarsi in Italia.');
+  }
+  // Visibilità "solo club": consentita solo agli admin (creatore/moderatore) del club.
+  if (input.privacy === 'club') {
+    input.club_id = v.int(req.body.club_id, 'Club', { min: 1 });
+    if (!(await isClubAdmin(input.club_id, req.user.id))) {
+      throw new HttpError(403, 'Solo gli admin del club possono creare contenuti riservati al club.');
+    }
+  } else {
+    input.club_id = null;
+  }
   const route = await createRoute(req.user.id, input);
   res.status(201).json({ route });
 });
@@ -150,7 +172,19 @@ export const update = asyncHandler(async (req, res) => {
   if (req.body.category !== undefined) set('category', v.oneOf(req.body.category, ROUTE_CATEGORIES, 'Categoria'));
   if (req.body.difficulty !== undefined) set('difficulty', v.oneOf(req.body.difficulty, ROUTE_DIFFICULTIES, 'Difficoltà'));
   if (req.body.vehicle_type !== undefined) set('vehicle_type', v.oneOf(req.body.vehicle_type, ROUTE_VEHICLE_TYPES, 'Tipo veicolo'));
-  if (req.body.privacy !== undefined) set('privacy', v.oneOf(req.body.privacy, PRIVACY, 'Privacy'));
+  if (req.body.privacy !== undefined) {
+    const privacy = v.oneOf(req.body.privacy, ROUTE_PRIVACY, 'Privacy');
+    set('privacy', privacy);
+    if (privacy === 'club') {
+      const clubId = v.int(req.body.club_id ?? route.club_id, 'Club', { min: 1 });
+      if (!(await isClubAdmin(clubId, req.user.id))) {
+        throw new HttpError(403, 'Solo gli admin del club possono riservare il percorso al club.');
+      }
+      set('club_id', clubId);
+    } else {
+      set('club_id', null);
+    }
+  }
   if (!fields.length) throw new HttpError(400, 'Nessun campo da aggiornare.');
 
   args.push(id);

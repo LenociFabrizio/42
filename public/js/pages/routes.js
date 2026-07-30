@@ -9,6 +9,7 @@ import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
 import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, DIFF_LEVEL, catLabel, catIcon } from '../core/constants.js';
 import { $, $$, svg, loader, toast, fmtDistance, fmtDuration, debounce, esc } from '../core/ui.js';
+import { privacyFrameClass, privacyBadge } from '../core/visibility.js';
 import api from '../core/api.js';
 
 const state = { q: '', category: '', difficulty: '' };
@@ -109,6 +110,11 @@ function renderRoutes(routes) {
     return;
   }
   $('#results').innerHTML = `<div class="grid grid-auto">${routes.map(tileHtml).join('')}</div>`;
+  // Inserisce il badge privacy (nodo) nella riga badge di ogni tile, in ordine.
+  const tiles = $$('#results .tile');
+  routes.forEach((r, i) => {
+    tiles[i]?.querySelector('.badges')?.append(privacyBadge(r.privacy));
+  });
 }
 
 /** Card percorso: copertina con icona categoria, tacche difficoltà, nome e riga sintetica. */
@@ -118,7 +124,7 @@ function tileHtml(r) {
   const dots = [1, 2, 3, 4].map((i) => `<i class="${i <= lvl ? 'on' : ''}"></i>`).join('');
   const cover = r.photo ? `background-image:url('${esc(r.photo)}');background-size:cover;background-position:center` : '';
   return `
-  <a class="tile" href="/route.html?id=${r.id}">
+  <a class="tile ${privacyFrameClass(r.privacy)}" href="/route.html?id=${r.id}">
     <div class="cover" style="${cover}">
       <div class="overlay"></div>
       <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;${r.photo ? 'opacity:.35' : ''}">${svg(catIcon(r.category), 44)}</span>

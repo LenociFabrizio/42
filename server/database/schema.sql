@@ -107,7 +107,8 @@ CREATE TABLE IF NOT EXISTS routes (
   bbox_min_lng        REAL,
   bbox_max_lat        REAL,
   bbox_max_lng        REAL,
-  privacy             TEXT    NOT NULL DEFAULT 'public', -- 'public' | 'private'
+  privacy             TEXT    NOT NULL DEFAULT 'public', -- 'public' | 'private' | 'club'
+  club_id             INTEGER,                            -- se privacy='club', club a cui è riservato
   -- Record UFFICIALE: appartiene SEMPRE al creatore del percorso.
   -- Punta alla completion del creatore scelta come record principale.
   record_completion_id INTEGER,
@@ -188,6 +189,8 @@ CREATE TABLE IF NOT EXISTS events (
   area_name           TEXT    DEFAULT '',
   radius_m            INTEGER NOT NULL DEFAULT 1000,
   status              TEXT    NOT NULL DEFAULT 'scheduled', -- 'scheduled'|'live'|'ended'|'cancelled'
+  privacy             TEXT    NOT NULL DEFAULT 'public',    -- 'public' | 'club'
+  club_id             INTEGER,                              -- se privacy='club', club a cui è riservato
   created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (creator_id) REFERENCES users(id)  ON DELETE CASCADE,
   FOREIGN KEY (route_id)   REFERENCES routes(id) ON DELETE SET NULL

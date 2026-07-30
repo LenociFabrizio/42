@@ -11,6 +11,7 @@ import { createMap, setRouteLine, addMarker } from '../core/map.js';
 import { getCurrentPosition, haversine, roadRoute } from '../core/geo.js';
 import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, ROUTE_VEHICLE_TYPES } from '../core/constants.js';
 import { $, svg, el, loader, toast, modal, fmtDistance, fmtDuration } from '../core/ui.js';
+import { buildPrivacyControl } from '../core/visibility.js';
 import api from '../core/api.js';
 
 let map;
@@ -142,11 +143,12 @@ function openSaveSheet() {
       <div class="field"><label>Categoria</label><select class="select" id="r-cat">${catSel}</select></div>
       <div class="field"><label>Difficoltà</label><select class="select" id="r-diff">${diffSel}</select></div>
     </div>
-    <div class="grid grid-2">
-      <div class="field"><label>Veicolo</label><select class="select" id="r-veh">${vehSel}</select></div>
-      <div class="field"><label>Privacy</label><select class="select" id="r-priv"><option value="public">Pubblico</option><option value="private">Privato</option></select></div>
-    </div>
+    <div class="field"><label>Veicolo</label><select class="select" id="r-veh">${vehSel}</select></div>
+    <div id="priv-slot"></div>
   ` });
+
+  const priv = buildPrivacyControl('route');
+  form.querySelector('#priv-slot').append(priv.node);
 
   const save = el('button', { class: 'btn btn-primary', text: 'Salva percorso' });
   const m = modal({ title: 'Salva il percorso', content: form, footer: [save] });
@@ -154,6 +156,8 @@ function openSaveSheet() {
   save.addEventListener('click', async () => {
     const name = $('#r-name', form).value.trim();
     if (name.length < 3) { toast.error('Dai un nome al percorso (min. 3 caratteri).'); return; }
+    const pv = priv.value;
+    if (!pv.valid) { toast.error(pv.error); return; }
     save.disabled = true; save.textContent = 'Salvataggio…';
     try {
       const track = routeGeom.map((p) => ({ lat: p[0] ?? p.lat, lng: p[1] ?? p.lng }));
@@ -163,7 +167,8 @@ function openSaveSheet() {
         category: $('#r-cat', form).value,
         difficulty: $('#r-diff', form).value,
         vehicle_type: $('#r-veh', form).value,
-        privacy: $('#r-priv', form).value,
+        privacy: pv.privacy,
+        club_id: pv.club_id,
         track,
       });
       toast.success('Percorso creato! +XP 🎉');

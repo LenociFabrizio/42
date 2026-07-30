@@ -8,6 +8,7 @@ import { guard } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
 import { $, el, svg, loader, toast, fmtDate } from '../core/ui.js';
+import { privacyFrameClass, privacyBadge } from '../core/visibility.js';
 import api from '../core/api.js';
 
 const TABS = [
@@ -109,9 +110,10 @@ function eventCard(ev) {
   const pills = el('div', { class: 'flex items-center gap-2 wrap', style: 'margin-top:6px' }, [
     el('span', { class: `pill ${sp.cls}`, text: sp.label }),
     ev.joined ? el('span', { class: 'pill accent', text: '✓ Iscritto' }) : null,
+    privacyBadge(ev.privacy),
   ]);
 
-  return el('a', { class: 'list-item', href: `/event.html?id=${ev.id}` }, [
+  return el('a', { class: `list-item ${privacyFrameClass(ev.privacy)}`, href: `/event.html?id=${ev.id}` }, [
     el('div', { class: 'li-body' }, [
       el('div', { class: 'li-title truncate', text: ev.name }),
       el('div', { class: 'li-sub', text: `📅 ${fmtDate(ev.starts_at, { withTime: true })}` }),

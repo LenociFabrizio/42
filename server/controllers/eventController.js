@@ -9,6 +9,9 @@
 import db from '../database/db.js';
 import { asyncHandler, HttpError } from '../utils/helpers.js';
 import * as v from '../utils/validate.js';
+import { EVENT_PRIVACY } from '../utils/constants.js';
+import { isInItaly } from '../utils/geo.js';
+import { isClubAdmin, isClubMember } from '../services/clubAccess.js';
 import {
   deriveStatus,
   createEvent,
@@ -49,6 +52,16 @@ export const list = asyncHandler(async (req, res) => {
       where.push('e.area_lng >= ? AND e.area_lng <= ? AND e.area_lat >= ? AND e.area_lat <= ?');
       args.push(minLng, maxLng, minLat, maxLat);
     }
+  }
+
+  // Visibilità: pubblici a tutti; "club" solo ai membri (o al creatore).
+  if (req.user) {
+    where.push(
+      "(e.privacy = 'public' OR e.creator_id = ? OR (e.privacy = 'club' AND e.club_id IN (SELECT club_id FROM club_members WHERE user_id = ?)))"
+    );
+    args.push(req.user.id, req.user.id);
+  } else {
+    where.push("e.privacy = 'public'");
   }
 
   // Stato richiesto (derivato): validato contro l'insieme consentito.
@@ -92,6 +105,8 @@ export const list = asyncHandler(async (req, res) => {
       area_lng: r.area_lng,
       area_name: r.area_name,
       radius_m: r.radius_m,
+      privacy: r.privacy || 'public',
+      club_id: r.club_id || null,
       status,
       creator: { id: r.creator_id, nickname: r.creator_nickname, avatar: r.creator_avatar },
       participants_count: r.participants_count || 0,
@@ -108,6 +123,10 @@ export const getOne = asyncHandler(async (req, res) => {
   const id = v.int(req.params.id, 'id', { min: 1 });
   const event = await db.prepare('SELECT * FROM events WHERE id = ?').get(id);
   if (!event) throw new HttpError(404, 'Evento non trovato.');
+  if (event.privacy === 'club' && event.creator_id !== req.user?.id) {
+    const ok = req.user ? await isClubMember(event.club_id, req.user.id) : false;
+    if (!ok) throw new HttpError(403, 'Evento riservato ai membri del club.');
+  }
 
   const creator = await db
     .prepare('SELECT id, nickname, avatar, level FROM users WHERE id = ?')
@@ -164,7 +183,23 @@ export const create = asyncHandler(async (req, res) => {
     area_lng: v.longitude(req.body.area_lng, 'Longitudine area'),
     area_name: v.optStr(req.body.area_name, 'Nome area', { max: 120 }),
     radius_m: v.int(req.body.radius_m, 'Raggio', { min: 50, max: 200000, def: 1000 }),
+    privacy: v.oneOf(req.body.privacy, EVENT_PRIVACY, 'Privacy', { def: 'public' }),
   };
+
+  // Solo territorio italiano: l'area di ritrovo deve essere in Italia.
+  if (!isInItaly(input.area_lat, input.area_lng)) {
+    throw new HttpError(400, "La WebApp è disponibile solo per il territorio italiano: l'area di ritrovo deve trovarsi in Italia.");
+  }
+
+  // Evento "solo club": consentito solo agli admin (creatore/moderatore) del club.
+  if (input.privacy === 'club') {
+    input.club_id = v.int(req.body.club_id, 'Club', { min: 1 });
+    if (!(await isClubAdmin(input.club_id, req.user.id))) {
+      throw new HttpError(403, 'Solo gli admin del club possono creare eventi riservati al club.');
+    }
+  } else {
+    input.club_id = null;
+  }
 
   // Il percorso associato deve esistere ed essere visibile all'utente.
   if (input.route_id) {
@@ -214,6 +249,19 @@ export const update = asyncHandler(async (req, res) => {
   }
   if (req.body.area_name !== undefined) set('area_name', v.optStr(req.body.area_name, 'Nome area', { max: 120 }));
   if (req.body.radius_m !== undefined) set('radius_m', v.int(req.body.radius_m, 'Raggio', { min: 50, max: 200000 }));
+  if (req.body.privacy !== undefined) {
+    const privacy = v.oneOf(req.body.privacy, EVENT_PRIVACY, 'Privacy');
+    set('privacy', privacy);
+    if (privacy === 'club') {
+      const clubId = v.int(req.body.club_id ?? event.club_id, 'Club', { min: 1 });
+      if (!(await isClubAdmin(clubId, req.user.id))) {
+        throw new HttpError(403, "Solo gli admin del club possono riservare l'evento al club.");
+      }
+      set('club_id', clubId);
+    } else {
+      set('club_id', null);
+    }
+  }
 
   if (!fields.length) throw new HttpError(400, 'Nessun campo da aggiornare.');
 

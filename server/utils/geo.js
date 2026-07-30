@@ -17,6 +17,21 @@ const toRad = (d) => (d * Math.PI) / 180;
 const lat = (p) => (Array.isArray(p) ? p[0] : p.lat);
 const lng = (p) => (Array.isArray(p) ? p[1] : p.lng);
 
+/**
+ * Riquadro dell'Italia (leggermente generoso: include isole minori come
+ * Lampedusa a sud). La WebApp opera solo sul territorio italiano.
+ */
+export const ITALY_BBOX = { minLat: 35.2, minLng: 6.5, maxLat: 47.3, maxLng: 18.7 };
+
+/** True se la coordinata ricade nel territorio italiano (approssimazione bbox). */
+export function isInItaly(lat, lng) {
+  return (
+    Number.isFinite(lat) && Number.isFinite(lng) &&
+    lat >= ITALY_BBOX.minLat && lat <= ITALY_BBOX.maxLat &&
+    lng >= ITALY_BBOX.minLng && lng <= ITALY_BBOX.maxLng
+  );
+}
+
 /** Distanza in metri tra due coordinate (Haversine). */
 export function haversine(aLat, aLng, bLat, bLng) {
   const dLat = toRad(bLat - aLat);

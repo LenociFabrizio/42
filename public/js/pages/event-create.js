@@ -10,6 +10,7 @@ import { registerPWA } from '../core/pwa.js';
 import { createMap } from '../core/map.js';
 import { getCurrentPosition } from '../core/geo.js';
 import { $, el, svg, loader, toast, fmtDistance } from '../core/ui.js';
+import { buildPrivacyControl } from '../core/visibility.js';
 import api from '../core/api.js';
 
 const data = {
@@ -54,8 +55,8 @@ function renderStep1() {
 
   const mapEl = el('div', { id: 'map', style: 'position:absolute;inset:0' });
   const crosshair = el('div', {
-    style: 'position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);font-size:2.4rem;pointer-events:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6));z-index:2',
-    text: '📍',
+    style: 'position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);color:var(--accent);pointer-events:none;filter:drop-shadow(0 2px 6px rgba(0,0,0,.7));z-index:2',
+    html: svg('pin', 40),
   });
   const mapWrap = el('div', {
     class: 'mb-3',
@@ -141,6 +142,7 @@ async function renderStep2() {
   const fMax = el('input', { class: 'input', type: 'number', min: '0', step: '1', value: String(data.max_participants) });
 
   const fRoute = el('select', { class: 'select' }, [el('option', { value: '', text: 'Nessuno' })]);
+  const priv = buildPrivacyControl('event');
 
   const back = el('button', { class: 'btn btn-outline', style: 'flex:1', text: 'Indietro' });
   const submit = el('button', { class: 'btn btn-primary', style: 'flex:2', text: 'Crea evento' });
@@ -159,6 +161,7 @@ async function renderStep2() {
       el('div', { class: 'field' }, [el('label', { text: 'Posti (0 = illimitati)' }), fMax]),
     ]),
     el('div', { class: 'field' }, [el('label', { text: 'Percorso collegato (facoltativo)' }), fRoute]),
+    priv.node,
     el('div', { class: 'flex gap-2 mt-2' }, [back, submit]),
   );
 
@@ -175,7 +178,7 @@ async function renderStep2() {
     renderStep1();
   });
 
-  submit.addEventListener('click', () => onSubmit({ fName, fDesc, fDate, fTime, fDur, fMax, fRoute, submit }));
+  submit.addEventListener('click', () => onSubmit({ fName, fDesc, fDate, fTime, fDur, fMax, fRoute, priv, submit }));
 }
 
 function saveStep2({ fName, fDesc, fDate, fTime, fDur, fMax, fRoute }) {
@@ -213,6 +216,9 @@ async function onSubmit(f) {
   if (isNaN(dt.getTime())) { toast.error('Data/ora non valide.'); return; }
   if (data.duration_min < 15) { toast.error('La durata minima è 15 minuti.'); return; }
 
+  const pv = f.priv.value;
+  if (!pv.valid) { toast.error(pv.error); return; }
+
   const payload = {
     name: data.name,
     description: data.description,
@@ -223,6 +229,8 @@ async function onSubmit(f) {
     area_lng: data.area_lng,
     area_name: data.area_name || undefined,
     radius_m: data.radius_m,
+    privacy: pv.privacy,
+    club_id: pv.club_id,
   };
   if (data.route_id) payload.route_id = parseInt(data.route_id, 10);
 

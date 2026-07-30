@@ -15,6 +15,7 @@ import {
   $, svg, el, loader, toast, modal, confirmDialog,
   fmtDistance, fmtDuration, fmtChrono, fmtSpeed, fmtDate, qs, esc,
 } from '../core/ui.js';
+import { privacyBadge } from '../core/visibility.js';
 import api from '../core/api.js';
 
 const DEFAULT_AVATAR = '/images/avatars/default.svg';
@@ -75,7 +76,7 @@ function render(data) {
       <span class="text-mid">${esc(creator.nickname || 'Anonimo')}</span>
     </a>
 
-    <div class="flex gap-2 wrap mb-4">
+    <div class="flex gap-2 wrap mb-4" id="route-chips">
       <span class="chip sm">${svg(catIcon(route.category), 14)} ${esc(catLabel(route.category))}</span>
       <span class="chip sm">${diffDots(route.difficulty)} ${esc(diffLbl)}</span>
       ${tags.map((t) => `<span class="chip sm">#${esc(t)}</span>`).join('')}
@@ -132,6 +133,9 @@ function render(data) {
     <h2 class="mb-3 mt-4">Classifica tempi</h2>
     <div id="lb"><div class="empty"><div class="ic">${svg('clock', 46)}</div><p class="text-lo">Caricamento classifica…</p></div></div>
   `;
+
+  // Badge privacy (nodo) accanto ai chip di categoria/difficoltà/tag.
+  $('#route-chips')?.append(privacyBadge(route.privacy));
 
   renderLike();
   $('#like-btn').addEventListener('click', onLike);

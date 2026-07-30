@@ -15,6 +15,10 @@ export const ROUTE_DIFFICULTIES = ['facile', 'media', 'difficile', 'estrema'];
 export const VEHICLE_TYPES = ['car', 'moto'];
 export const ROUTE_VEHICLE_TYPES = ['car', 'moto', 'both'];
 export const PRIVACY = ['public', 'private'];
+// Visibilità estesa: i percorsi possono essere pubblici, privati o riservati a
+// un club; gli eventi pubblici o riservati a un club.
+export const ROUTE_PRIVACY = ['public', 'private', 'club'];
+export const EVENT_PRIVACY = ['public', 'club'];
 
 export const EVENT_STATUS = {
   SCHEDULED: 'scheduled',

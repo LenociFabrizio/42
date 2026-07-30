@@ -8,7 +8,8 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "seed": "node server/database/seed.js",
-    "db:reset": "node server/database/seed.js --reset"
+    "db:reset": "node server/database/seed.js --reset",
+    "version:bump": "node scripts/version-bump.cjs"
   },
   "keywords": [
     "motorcycle",

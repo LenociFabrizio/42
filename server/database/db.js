@@ -109,11 +109,18 @@ export async function initSchema() {
  * future dello schema senza perdere dati.
  */
 async function runMigrations() {
-  // Esempio di pattern (aggiungere colonna se mancante):
-  // const cols = await db.all('PRAGMA table_info(users)');
-  // if (!cols.some((c) => c.name === 'nuova_colonna')) {
-  //   await db.run("ALTER TABLE users ADD COLUMN nuova_colonna TEXT DEFAULT ''");
-  // }
+  // Visibilità "solo club" per percorsi ed eventi.
+  const routeCols = await db.all('PRAGMA table_info(routes)');
+  if (routeCols.length && !routeCols.some((c) => c.name === 'club_id')) {
+    await db.run('ALTER TABLE routes ADD COLUMN club_id INTEGER');
+  }
+  const eventCols = await db.all('PRAGMA table_info(events)');
+  if (eventCols.length && !eventCols.some((c) => c.name === 'privacy')) {
+    await db.run("ALTER TABLE events ADD COLUMN privacy TEXT NOT NULL DEFAULT 'public'");
+  }
+  if (eventCols.length && !eventCols.some((c) => c.name === 'club_id')) {
+    await db.run('ALTER TABLE events ADD COLUMN club_id INTEGER');
+  }
 }
 
 export default db;

@@ -4,9 +4,11 @@ import { auth } from '../core/auth.js';
 import { $, toast } from '../core/ui.js';
 import { initConsent } from '../core/consent.js';
 import { markTutorialPending } from '../core/onboarding.js';
+import { stampVersion } from '../core/version.js';
 
 if (auth.isLogged()) location.href = '/index.html';
 initConsent();
+stampVersion();
 
 const form = $('#register-form');
 form.addEventListener('submit', async (e) => {

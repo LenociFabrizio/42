@@ -163,7 +163,7 @@ function membersSection(members, myRole, myId, club) {
   for (const m of members) {
     const right = el('div', { class: 'flex items-center gap-2' });
     if (m.role === 'creator') right.append(el('span', { class: 'pill accent', text: 'Creatore' }));
-    else if (m.role === 'moderator') right.append(el('span', { class: 'pill gray', text: 'Mod' }));
+    else if (m.role === 'moderator') right.append(el('span', { class: 'pill gray', text: 'Admin' }));
 
     if (myRole === 'creator' && m.role !== 'creator' && m.user_id !== myId) {
       const menuBtn = el('button', { class: 'btn btn-ghost btn-icon btn-sm', html: svg('settings', 18), 'aria-label': 'Gestisci membro' });
@@ -188,8 +188,8 @@ function membersSection(members, myRole, myId, club) {
 
 function openMemberMenu(m) {
   const buttons = [];
-  if (m.role === 'moderator') buttons.push(actionBtn('Rimuovi da moderatore', 'btn-outline', () => setRole(m.user_id, 'member')));
-  else buttons.push(actionBtn('Promuovi a moderatore', 'btn-primary', () => setRole(m.user_id, 'moderator')));
+  if (m.role === 'moderator') buttons.push(actionBtn('Rimuovi Admin', 'btn-outline', () => setRole(m.user_id, 'member')));
+  else buttons.push(actionBtn('Rendi Admin', 'btn-primary', () => setRole(m.user_id, 'moderator')));
 
   buttons.push(actionBtn('Espelli dal club', 'btn-danger', async () => {
     const ok = await confirmDialog({ title: 'Espellere il membro?', message: `${m.nickname} sarà rimosso dal club.`, confirmText: 'Espelli', danger: true });

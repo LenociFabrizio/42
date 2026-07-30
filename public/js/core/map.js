@@ -62,7 +62,10 @@ async function resolveStyle() {
  * Crea una mappa MapLibre nel container dato.
  * @returns {Promise<maplibregl.Map>}
  */
-export async function createMap(container, { center = [9.19, 45.46], zoom = 5.2 } = {}) {
+// La WebApp opera solo sul territorio italiano: la vista è vincolata all'Italia.
+const ITALY_MAXBOUNDS = [[6.2, 35.0], [19.0, 47.6]]; // [[ovest,sud],[est,nord]]
+
+export async function createMap(container, { center = [12.5, 42.5], zoom = 5.2 } = {}) {
   const maplibregl = await ensureMapLibre();
   const style = await resolveStyle();
   const map = new maplibregl.Map({
@@ -70,13 +73,35 @@ export async function createMap(container, { center = [9.19, 45.46], zoom = 5.2 
     style,
     center,
     zoom,
+    maxBounds: ITALY_MAXBOUNDS,
     attributionControl: { compact: true },
     dragRotate: false,
     pitchWithRotate: false,
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   map.touchZoomRotate.disableRotation();
+  // Confini delle regioni italiane, coerenti col tema (ambra tenue).
+  map.on('load', () => addRegionBorders(map));
   return map;
+}
+
+/** Aggiunge il perimetro delle regioni italiane come layer di linee. */
+async function addRegionBorders(map) {
+  try {
+    if (map.getSource('it-regions')) return;
+    const res = await fetch('/data/italy-regions.geojson');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (map.getSource('it-regions')) return;
+    map.addSource('it-regions', { type: 'geojson', data });
+    map.addLayer({
+      id: 'it-regions-line',
+      type: 'line',
+      source: 'it-regions',
+      paint: { 'line-color': '#ffb020', 'line-opacity': 0.3, 'line-width': 1.1, 'line-blur': 0.3 },
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+    });
+  } catch { /* confini non disponibili: la mappa resta usabile */ }
 }
 
 /** Aggiunge/aggiorna una linea-percorso (points = [[lat,lng], ...]). */

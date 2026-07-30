@@ -444,3 +444,12 @@
 @keyframes proxIn { from { opacity: 0; transform: translateY(30px) scale(0.96); } to { opacity: 1; transform: none; } }
 @keyframes proxOut { to { opacity: 0; transform: translateY(30px) scale(0.96); } }
 @keyframes proxPulse { 0% { box-shadow: 0 0 0 0 var(--accent-glow); } 70% { box-shadow: 0 0 0 12px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+/* ---------------- Cornici per privacy (percorsi/eventi) ---------------- */
+.priv-private { border-color: var(--warning) !important; }
+.priv-club { border-color: #a06bff !important; box-shadow: 0 0 0 1px rgba(160, 107, 255, 0.22); }
+.priv-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--r-pill); font-size: 0.72rem; font-weight: var(--fw-semibold); }
+.priv-badge svg { display: block; }
+.priv-badge.public { background: rgba(41, 196, 106, 0.14); color: var(--success); }
+.priv-badge.private { background: rgba(255, 207, 51, 0.16); color: var(--warning); }
+.priv-badge.club { background: rgba(160, 107, 255, 0.16); color: #a06bff; }

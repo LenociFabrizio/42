@@ -43,14 +43,14 @@ export async function createRoute(userId, input) {
          (creator_id, name, description, photo, category, difficulty, vehicle_type,
           start_lat, start_lng, start_name, end_lat, end_lng, end_name,
           track_polyline, distance_m, elevation_gain_m, est_time_s,
-          bbox_min_lat, bbox_min_lng, bbox_max_lat, bbox_max_lng, privacy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          bbox_min_lat, bbox_min_lng, bbox_max_lat, bbox_max_lng, privacy, club_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       userId, input.name, input.description, input.photo || null, input.category, input.difficulty, input.vehicle_type,
       start.lat, start.lng, input.start_name || '', end.lat, end.lng, input.end_name || '',
       polyline, metrics.distance_m, metrics.elevation_gain_m, estTime,
-      box.minLat, box.minLng, box.maxLat, box.maxLng, input.privacy
+      box.minLat, box.minLng, box.maxLat, box.maxLng, input.privacy, input.club_id || null
     );
   const routeId = info.lastInsertRowid;
 

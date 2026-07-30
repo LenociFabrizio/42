@@ -10,6 +10,7 @@ import { registerPWA } from '../core/pwa.js';
 import { createMap, addMarker, fitPoints } from '../core/map.js';
 import { getCurrentPosition } from '../core/geo.js';
 import { $, el, svg, loader, toast, confirmDialog, fmtDate, fmtDistance, esc, qs } from '../core/ui.js';
+import { privacyBadge } from '../core/visibility.js';
 import api from '../core/api.js';
 
 const DEFAULT_AVATAR = '/images/avatars/default.svg';
@@ -99,6 +100,7 @@ async function render() {
     el('div', { class: 'flex items-center gap-2 wrap mb-2' }, [
       el('span', { class: `pill ${sp.cls}`, text: sp.label }),
       joined ? el('span', { class: 'pill accent', text: checkedIn ? '✓ Presente' : '✓ Iscritto' }) : null,
+      privacyBadge(ev.privacy),
     ]),
     el('h1', { class: 'mb-3', text: ev.name }),
     el('a', { class: 'flex items-center gap-2 mb-3', href: `/profile.html?id=${creator.id || ''}` }, [
