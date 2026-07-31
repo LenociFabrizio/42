@@ -29,6 +29,11 @@ router.get('/config', (_req, res) => {
       styleUrl: config.map.styleUrl || null,
       tileKey: config.map.tileKey || null,
     },
+    // Client ID Google (pubblico per progetto): se assente il client non
+    // mostra il pulsante "Continua con Google".
+    google: {
+      clientId: config.google.clientId || null,
+    },
   });
 });
 

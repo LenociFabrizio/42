@@ -29,6 +29,22 @@ export const ROUTE_VEHICLE_TYPES = [
   { v: 'moto', l: 'Moto', icon: 'bike' },
   { v: 'car', l: 'Auto', icon: 'car' },
 ];
+/* Lunghezza minima di un percorso creato (in metri). Sotto questa soglia il
+   percorso non è salvabile: evita "percorsi" di pochi metri senza senso. */
+export const MIN_ROUTE_DISTANCE_M = 2000;
+
+/* Raggio di visibilità iniziale della mappa (km): quanto "vicino" si apre.
+   Modificabile in Impostazioni; il default è una vista ravvicinata. */
+export const MAP_RADIUS_OPTIONS = [
+  { v: 2, l: 'Molto vicino · 2 km' },
+  { v: 5, l: 'Vicino · 5 km' },
+  { v: 10, l: 'Medio · 10 km' },
+  { v: 25, l: 'Ampio · 25 km' },
+  { v: 50, l: 'Zona · 50 km' },
+  { v: 100, l: 'Regione · 100 km' },
+];
+export const DEFAULT_MAP_RADIUS_KM = 5;
+
 export const POI_CATEGORIES = [
   { v: 'panorama', l: 'Panorama', icon: 'eye' },
   { v: 'benzina', l: 'Benzinaio', icon: 'fuel' },

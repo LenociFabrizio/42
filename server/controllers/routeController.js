@@ -12,6 +12,7 @@ import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, ROUTE_VEHICLE_TYPES, ROUTE_PRIVAC
 import { persistUpload } from '../middleware/upload.js';
 import { isInItaly } from '../utils/geo.js';
 import { createRoute, submitCompletion } from '../services/routeService.js';
+import { recomputeUserStats } from '../services/stats.js';
 import { isClubAdmin, isClubMember } from '../services/clubAccess.js';
 
 /** Proiezione "card" di un percorso per liste/mappa. */
@@ -137,7 +138,17 @@ export const create = asyncHandler(async (req, res) => {
     end_name: v.optStr(req.body.end_name, 'Arrivo', { max: 120 }),
     tags: Array.isArray(req.body.tags) ? req.body.tags : [],
     track: v.track(req.body.track, 'Tracciato'),
+    // Veicolo usato durante la registrazione (facoltativo): attribuisce il
+    // primo giro del creatore al mezzo giusto.
+    vehicle_id: req.body.vehicle_id ? v.int(req.body.vehicle_id, 'Veicolo', { min: 1 }) : null,
   };
+  // Il veicolo dichiarato deve essere dell'utente.
+  if (input.vehicle_id) {
+    const owned = await db
+      .prepare('SELECT id FROM vehicles WHERE id = ? AND user_id = ?')
+      .get(input.vehicle_id, req.user.id);
+    if (!owned) throw new HttpError(404, 'Veicolo non trovato.');
+  }
   // Solo territorio italiano: partenza e arrivo devono essere in Italia.
   const t0 = input.track[0], t1 = input.track[input.track.length - 1];
   if (!isInItaly(t0.lat, t0.lng) || !isInItaly(t1.lat, t1.lng)) {
@@ -201,6 +212,9 @@ export const remove = asyncHandler(async (req, res) => {
     throw new HttpError(403, 'Non autorizzato.');
   }
   await db.prepare('DELETE FROM routes WHERE id = ?').run(id);
+  // I completamenti del percorso cadono in cascata: le statistiche del
+  // creatore (km, tempo, percorsi, record) vanno ricalcolate.
+  await recomputeUserStats(route.creator_id);
   res.status(204).end();
 });
 

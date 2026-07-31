@@ -10,6 +10,10 @@
 html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  /* Nessuna pagina scorre in orizzontale: su mobile overflow-x sul solo body
+     non basta (il viewport resta pannabile) e la barra orizzontale su desktop
+     spingerebbe la bottom nav più in basso. */
+  overflow-x: hidden;
 }
 
 body {

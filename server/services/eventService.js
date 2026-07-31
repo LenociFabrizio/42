@@ -77,7 +77,14 @@ export async function createEvent(userId, input) {
     );
   const eventId = info.lastInsertRowid;
 
+  // L'organizzatore partecipa al proprio evento: senza questa riga non sarebbe
+  // contato tra i partecipanti né nelle sue statistiche "eventi".
+  await db
+    .prepare("INSERT OR IGNORE INTO event_participants (event_id, user_id, status) VALUES (?, ?, 'joined')")
+    .run(eventId, userId);
+
   await awardXp(userId, XP.CREATE_EVENT, 'event_created', 'event', eventId);
+  await recomputeUserStats(userId);
   await checkBadges(userId);
 
   return db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);

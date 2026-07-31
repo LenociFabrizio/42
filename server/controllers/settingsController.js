@@ -48,6 +48,20 @@ export const updateSettings = asyncHandler(async (req, res) => {
   if (req.body.notify_records !== undefined) set('notify_records', v.bool(req.body.notify_records) ? 1 : 0);
   if (req.body.notify_clubs !== undefined) set('notify_clubs', v.bool(req.body.notify_clubs) ? 1 : 0);
 
+  // Preferenze di navigazione (indicazioni verso percorsi/eventi).
+  if (req.body.nav_avoid_tolls !== undefined) set('nav_avoid_tolls', v.bool(req.body.nav_avoid_tolls) ? 1 : 0);
+  if (req.body.nav_avoid_motorways !== undefined) set('nav_avoid_motorways', v.bool(req.body.nav_avoid_motorways) ? 1 : 0);
+  if (req.body.nav_avoid_ztl !== undefined) set('nav_avoid_ztl', v.bool(req.body.nav_avoid_ztl) ? 1 : 0);
+  if (req.body.nav_avoid_ferries !== undefined) set('nav_avoid_ferries', v.bool(req.body.nav_avoid_ferries) ? 1 : 0);
+  if (req.body.nav_profile !== undefined) {
+    set('nav_profile', v.oneOf(req.body.nav_profile, ['auto', 'car', 'moto'], 'Profilo navigazione'));
+  }
+
+  // Raggio di visibilità iniziale della mappa (km).
+  if (req.body.map_radius_km !== undefined) {
+    set('map_radius_km', v.int(req.body.map_radius_km, 'Raggio mappa', { min: 1, max: 200 }));
+  }
+
   if (!fields.length) throw new HttpError(400, 'Nessun campo da aggiornare.');
 
   args.push(req.user.id);
@@ -61,9 +75,18 @@ export const updateSettings = asyncHandler(async (req, res) => {
  * La cancellazione dell'utente rimuove tutte le righe correlate (ON DELETE CASCADE).
  */
 export const deleteAccount = asyncHandler(async (req, res) => {
-  const password = req.body.password == null ? '' : String(req.body.password);
-  const ok = await bcrypt.compare(password, req.user.password_hash);
-  if (!ok) throw new HttpError(400, 'Password errata.');
+  if (req.user.password_hash) {
+    const password = req.body.password == null ? '' : String(req.body.password);
+    const ok = await bcrypt.compare(password, req.user.password_hash);
+    if (!ok) throw new HttpError(400, 'Password errata.');
+  } else {
+    // Account solo-Google: non c'è password da verificare. Chiediamo di
+    // riscrivere il nickname come conferma esplicita e non ambigua.
+    const confirm = String(req.body.confirm_nickname || '').trim();
+    if (confirm !== req.user.nickname) {
+      throw new HttpError(400, 'Per confermare, riscrivi esattamente il tuo nickname.');
+    }
+  }
 
   await db.prepare('DELETE FROM users WHERE id = ?').run(req.user.id);
   res.status(204).end();

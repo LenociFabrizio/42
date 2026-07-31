@@ -70,6 +70,15 @@ export const markAllRead = asyncHandler(async (req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * DELETE /api/notifications — svuota il centro notifiche: elimina TUTTE le
+ * notifiche dell'utente (operazione irreversibile, confermata dal client).
+ */
+export const removeAll = asyncHandler(async (req, res) => {
+  const info = await db.prepare('DELETE FROM notifications WHERE user_id = ?').run(req.user.id);
+  res.json({ deleted: info.changes || 0 });
+});
+
 /** DELETE /api/notifications/:id — elimina una notifica dell'utente. */
 export const remove = asyncHandler(async (req, res) => {
   const id = v.int(req.params.id, 'id', { min: 1 });

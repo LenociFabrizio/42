@@ -15,7 +15,9 @@ const NAV = [
   { key: 'routes', label: 'Percorsi', href: '/routes.html', icon: 'route' },
   { key: 'crea', label: 'Crea', crea: true, icon: 'plus' },
   { key: 'events', label: 'Eventi', href: '/events.html', icon: 'calendar' },
-  { key: 'profile', label: 'Profilo', href: '/profile.html', icon: 'user' },
+  // Il profilo è già raggiungibile dall'avatar in alto a destra: qui, in fondo
+  // a destra, mettiamo i Club.
+  { key: 'clubs', label: 'Club', href: '/clubs.html', icon: 'building' },
 ];
 
 /** Foglio di creazione (Percorso / Evento). */
@@ -50,12 +52,16 @@ function buildTopbar() {
   const bell = el('a', { href: '/notifications.html', class: 'btn-icon btn-ghost bell', 'aria-label': 'Notifiche', html: svg('bell', 24) });
   bell.append(bellDot);
 
+  // Impostazioni e Amici: stessa forma del pulsante notifiche, subito accanto.
+  const gear = el('a', { href: '/settings.html', class: 'btn-icon btn-ghost', 'aria-label': 'Impostazioni', html: svg('settings', 24) });
+  const friends = el('a', { href: '/friends.html', class: 'btn-icon btn-ghost', 'aria-label': 'Amici', html: svg('users', 24) });
+
   const bar = el('header', { class: 'topbar' }, [
     el('a', { href: '/index.html', class: 'brand' }, [
       el('span', { class: 'brand-logo', html: `4 <span class="amp">&amp;</span><span class="sep">|</span> 2` }),
       el('span', { class: 'beta-tag', text: 'Beta' }),
     ]),
-    el('div', { class: 'topbar-actions' }, [bell, ring]),
+    el('div', { class: 'topbar-actions' }, [gear, friends, bell, ring]),
   ]);
   return { bar, bellDot };
 }

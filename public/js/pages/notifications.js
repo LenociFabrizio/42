@@ -8,7 +8,7 @@ import '../core/theme.js';
 import { guard } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
-import { $, el, svg, loader, toast, timeAgo } from '../core/ui.js';
+import { $, el, svg, loader, toast, timeAgo, confirmDialog } from '../core/ui.js';
 import { notifIcon } from '../core/constants.js';
 import api from '../core/api.js';
 
@@ -30,13 +30,22 @@ async function main() {
   mountShell({ active: '' });
 
   const root = $('#root');
-  root.append(el('h1', { text: 'Notifiche', style: 'margin-bottom:var(--sp-4)' }));
+  const clearBtn = el('button', {
+    class: 'btn btn-outline btn-sm',
+    html: `${svg('trash', 18)}<span>Pulisci tutto</span>`,
+    onClick: () => clearAll(wrap, clearBtn),
+  });
+  root.append(el('div', { class: 'flex justify-between items-center gap-2', style: 'margin-bottom:var(--sp-4)' }, [
+    el('h1', { text: 'Notifiche', style: 'margin:0' }),
+    clearBtn,
+  ]));
   const wrap = el('div', {});
   root.append(wrap);
 
   try {
     const { notifications, unread } = await api.get('/notifications');
     render(wrap, notifications || []);
+    clearBtn.disabled = !(notifications || []).length;
     // Svuota la campanella dopo aver reso la lista (l'evidenza resta visiva).
     if (unread > 0) api.post('/notifications/read-all').catch(() => { /* silenzioso */ });
   } catch (err) {
@@ -46,6 +55,29 @@ async function main() {
     ]));
   } finally {
     loader.hide();
+  }
+}
+
+/** Svuota il centro notifiche (con conferma: l'operazione è irreversibile). */
+async function clearAll(wrap, btn) {
+  const ok = await confirmDialog({
+    title: 'Eliminare tutte le notifiche?',
+    message: 'Il centro notifiche verrà svuotato. L\'operazione non è reversibile.',
+    confirmText: 'Elimina tutto',
+    danger: true,
+  });
+  if (!ok) return;
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Pulizia…';
+  try {
+    const { deleted } = await api.del('/notifications');
+    render(wrap, []);
+    toast.success(deleted ? `${deleted} notifiche eliminate.` : 'Nessuna notifica da eliminare.');
+  } catch (err) {
+    toast.error(err.message || 'Eliminazione non riuscita.');
+    btn.disabled = false;
+    btn.innerHTML = original;
   }
 }
 

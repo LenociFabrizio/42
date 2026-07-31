@@ -21,13 +21,38 @@ const tierClass = (t) => (TIERS.includes(t) ? t : 'bronze');
 const stat = (v, k) => el('div', { class: 'stat' }, [el('div', { class: 'v', text: v }), el('div', { class: 'k', text: k })]);
 const empty = (iconName, msg) => el('div', { class: 'empty' }, [el('div', { class: 'ic', html: svg(iconName, 46) }), el('p', { text: msg })]);
 
+/**
+ * Card richiudibile: intestazione cliccabile + contenuto espandibile.
+ * Usa <details>, così apertura/chiusura funzionano anche senza JS.
+ * @param {object} o
+ * @param {string} o.title      titolo della sezione
+ * @param {string} [o.icon]     icona SVG accanto al titolo
+ * @param {string} [o.count]    contatore mostrato nell'intestazione (es. "3/12")
+ * @param {boolean} [o.open]    se partire già espansa
+ * @param {Node|Node[]} o.body  contenuto
+ */
+function collapsibleCard({ title, icon = null, count = null, open = false, body }) {
+  const summary = el('summary', {}, [
+    icon ? el('span', { class: 'flex', html: svg(icon, 20) }) : null,
+    el('span', { text: title }),
+    count != null ? el('span', { class: 'cl-count', text: String(count) }) : null,
+    el('span', { class: 'cl-chev', html: svg('chevron', 20) }),
+  ]);
+  const details = el('details', { class: 'card collapse', style: 'margin-top:var(--sp-3)' }, [
+    summary,
+    el('div', { class: 'cl-body' }, [].concat(body)),
+  ]);
+  if (open) details.open = true;
+  return details;
+}
+
 async function main() {
   const me = await guard();
   if (!me) return;
   registerPWA();
   const viewId = qs.get('id');
   const isOwn = !viewId || String(viewId) === String(me.id);
-  mountShell({ active: isOwn ? 'profile' : '' });
+  mountShell({ active: '' });
 
   const root = $('#root');
   try {
@@ -175,9 +200,11 @@ function statsCard(user) {
 /* -------------------- Azioni (solo proprio) -------------------- */
 function actionsCard() {
   return el('div', { class: 'card', style: 'margin-top:var(--sp-3)' }, [
-    el('div', { class: 'grid grid-2' }, [
-      el('button', { class: 'btn btn-outline', html: `${svg('edit', 20)} Modifica profilo`, onClick: () => openEditModal() }),
-      el('button', { class: 'btn btn-outline', html: `${svg('key', 20)} Password`, onClick: openPasswordModal }),
+    // .btn-pair: celle che possono restringersi, così l'etichetta lunga non
+    // sborda dal bottone e i due pulsanti restano allineati.
+    el('div', { class: 'btn-pair' }, [
+      el('button', { class: 'btn btn-outline', html: `${svg('edit', 20)}<span>Modifica profilo</span>`, onClick: () => openEditModal() }),
+      el('button', { class: 'btn btn-outline', html: `${svg('key', 20)}<span>Password</span>`, onClick: openPasswordModal }),
     ]),
     el('div', { class: 'profile-nav', style: 'margin-top:var(--sp-3)' }, [
       el('a', { class: 'btn btn-outline', href: '/settings.html', html: `${svg('settings', 22)}<span>Impostazioni</span>` }),
@@ -244,25 +271,32 @@ function openEditModal() {
 }
 
 function openPasswordModal() {
+  // Chi si è registrato con Google non ha una password: la IMPOSTA (nessuna
+  // password attuale da confermare).
+  const hasPassword = auth.user?.has_password !== false;
   const cur = el('input', { class: 'input', type: 'password', autocomplete: 'current-password', placeholder: 'Password attuale' });
   const nw = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', placeholder: 'Nuova password (min. 8)' });
   const body = el('div', {}, [
-    el('div', { class: 'field' }, [el('label', { text: 'Password attuale' }), cur]),
-    el('div', { class: 'field' }, [el('label', { text: 'Nuova password' }), nw]),
+    hasPassword
+      ? el('div', { class: 'field' }, [el('label', { text: 'Password attuale' }), cur])
+      : el('p', { class: 'text-lo', style: 'font-size:.85rem;margin-bottom:var(--sp-3)', text: 'Accedi con Google: imposta una password per poter entrare anche con email e password.' }),
+    el('div', { class: 'field' }, [el('label', { text: hasPassword ? 'Nuova password' : 'Password' }), nw]),
   ]);
-  const save = el('button', { class: 'btn btn-primary', text: 'Aggiorna password' });
-  const m = modal({ title: 'Cambia password', content: body, footer: [save] });
+  const label = hasPassword ? 'Aggiorna password' : 'Imposta password';
+  const save = el('button', { class: 'btn btn-primary', text: label });
+  const m = modal({ title: hasPassword ? 'Cambia password' : 'Imposta password', content: body, footer: [save] });
 
   save.addEventListener('click', async () => {
-    if (nw.value.length < 8) { toast.error('La nuova password deve avere almeno 8 caratteri.'); return; }
+    if (nw.value.length < 8) { toast.error('La password deve avere almeno 8 caratteri.'); return; }
     save.disabled = true; save.textContent = 'Aggiornamento…';
     try {
-      await api.post('/auth/change-password', { current_password: cur.value, new_password: nw.value });
+      const res = await api.post('/auth/change-password', { current_password: cur.value, new_password: nw.value });
+      auth.user = { ...(auth.user || {}), has_password: true };
       m.close();
-      toast.success('Password aggiornata!');
+      toast.success(res?.message || 'Password aggiornata!');
     } catch (err) {
       toast.error(err.message || 'Operazione non riuscita.');
-      save.disabled = false; save.textContent = 'Aggiorna password';
+      save.disabled = false; save.textContent = label;
     }
   });
 }
@@ -361,39 +395,49 @@ function openVehicleModal(listWrap) {
 }
 
 /* -------------------- Distintivi -------------------- */
+/** Sezione distintivi: griglia a righe (più per riga) e richiudibile. */
 function badgesCard(badges, isOwn) {
-  const card = el('div', { class: 'card', style: 'margin-top:var(--sp-3)' }, [el('h3', { class: 'card-title', text: 'Distintivi' })]);
   if (!badges.length) {
-    card.append(empty('award', 'Nessun distintivo.'));
-    return card;
+    return collapsibleCard({ title: 'Distintivi', icon: 'award', body: empty('award', 'Nessun distintivo.') });
   }
-  const grid = el('div', { class: 'grid grid-auto' });
+  const earnedOf = (b) => (isOwn ? !!b.earned : true);
+  const grid = el('div', { class: 'badge-grid' });
   for (const b of badges) {
-    const earned = isOwn ? !!b.earned : true;
-    grid.append(el('div', { class: `gbadge ${tierClass(b.tier)} ${earned ? '' : 'locked'}`, title: b.description || '' }, [
+    grid.append(el('div', { class: `gbadge ${tierClass(b.tier)} ${earnedOf(b) ? '' : 'locked'}`, title: b.description || b.name || '' }, [
       el('div', { class: 'ic', html: svg(badgeIcon(b.code), 30) }),
       el('div', { class: 'nm', text: b.name || b.code || '' }),
     ]));
   }
-  card.append(grid);
-  return card;
+  const got = badges.filter(earnedOf).length;
+  return collapsibleCard({
+    title: 'Distintivi', icon: 'award',
+    count: isOwn ? `${got}/${badges.length}` : String(badges.length),
+    body: grid,
+  });
 }
 
 /* -------------------- Missioni (solo proprio) -------------------- */
+/** Sezione missioni: richiudibile, con contatore delle completate. */
 function missionsCard(missions) {
-  const card = el('div', { class: 'card', style: 'margin-top:var(--sp-3)' }, [el('h3', { class: 'card-title', text: 'Missioni' })]);
   if (!missions.length) {
-    card.append(empty('target', 'Nessuna missione attiva.'));
-    return card;
+    return collapsibleCard({ title: 'Missioni', icon: 'target', body: empty('target', 'Nessuna missione attiva.') });
   }
+  const body = el('div');
   const groups = [['daily', 'Giornaliere'], ['weekly', 'Settimanali'], ['achievement', 'Obiettivi']];
+  let first = true;
   for (const [period, label] of groups) {
     const items = missions.filter((m) => m.period === period);
     if (!items.length) continue;
-    card.append(el('div', { class: 'section-label', style: 'margin-top:var(--sp-3)', text: label }));
-    for (const m of items) card.append(missionRow(m));
+    body.append(el('div', { class: 'section-label', style: first ? '' : 'margin-top:var(--sp-4)', text: label }));
+    first = false;
+    for (const m of items) body.append(missionRow(m));
   }
-  return card;
+  const done = missions.filter((m) => m.completed).length;
+  return collapsibleCard({
+    title: 'Missioni', icon: 'target',
+    count: `${done}/${missions.length}`,
+    body,
+  });
 }
 
 function missionRow(m) {

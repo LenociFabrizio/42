@@ -17,37 +17,47 @@ const SLIDES = [
   {
     ic: 'map',
     title: 'La Mappa è la tua base',
-    text: 'Attorno a te trovi percorsi, eventi e punti di interesse. Usa il pulsante in basso a destra per centrarti sulla tua posizione.',
+    text: 'Attorno a te trovi percorsi, eventi e punti di interesse. Il pulsante con il mirino ti ricentra sulla tua posizione; quanto "vicino" si apre la mappa lo decidi tu dal raggio di visibilità in Impostazioni.',
+  },
+  {
+    ic: 'navigation',
+    title: 'Indicazioni in un tocco',
+    text: 'Tocca un percorso o un evento sulla mappa e scegli "Indicazioni": calcoliamo il tragitto più veloce dalla tua posizione. In Impostazioni puoi chiedere di evitare pedaggi, autostrade, traghetti e ZTL.',
   },
   {
     ic: 'plus',
     title: 'Il pulsante CREA',
-    text: 'Il tasto centrale in basso apre la creazione: registra un nuovo Percorso col GPS oppure organizza un Evento.',
+    text: 'Il tasto centrale in basso apre la creazione: registra un Percorso col GPS mentre guidi, disegnalo toccando la mappa, oppure organizza un Evento.',
   },
   {
     ic: 'trophy',
     title: 'Percorsi e Record',
-    text: 'Registra un tracciato mentre guidi. Il record ufficiale appartiene a chi crea il percorso; tu conservi il tuo miglior tempo personale e scali la classifica.',
+    text: 'Un percorso deve essere lungo almeno 2 km. Se lo registri guidando, quel giro diventa il tuo primo tempo e il record ufficiale del percorso: il record resta sempre di chi lo ha creato, gli altri conservano il proprio miglior tempo personale.',
   },
   {
     ic: 'megaphone',
-    title: 'Eventi live',
-    text: 'Organizza o partecipa a raduni. Il check-in avviene via GPS: risulti presente solo se sei davvero sul luogo del ritrovo.',
+    title: 'Avvisi di prossimità',
+    text: 'Quando arrivi entro 1 km da un percorso o dal ritrovo di un evento ti avvisiamo con un suono e un messaggio: puoi accettare al volo e fare il check-in GPS. Il suono si disattiva da Impostazioni.',
   },
   {
     ic: 'users',
-    title: 'Club e Amici',
-    text: 'Unisciti a un club, aggiungi amici e scalate insieme le classifiche. Le richieste di amicizia si gestiscono dalla sezione Amici.',
+    title: 'Live Map: chi è in strada',
+    text: 'Con il consenso attivo vedi gli altri piloti in movimento. Tocca il puntino di qualcuno per sapere subito che auto o moto sta guidando e da quanto tempo è online, senza uscire dalla mappa.',
+  },
+  {
+    ic: 'building',
+    title: 'Club, Amici e classifiche',
+    text: 'In alto a destra trovi Impostazioni, Amici e Notifiche; i Club sono in fondo a destra e il tuo profilo è l\'avatar in alto. Unisciti a un club e scalate insieme le classifiche.',
   },
   {
     ic: 'award',
-    title: 'Livelli, XP e Badge',
-    text: 'Ogni attività reale ti fa guadagnare XP e sblocca badge e livelli. La posizione live con gli amici è sempre disponibile (col tuo consenso); agli sconosciuti appari dal livello 5.',
+    title: 'Livelli, XP e Distintivi',
+    text: 'Ogni attività reale ti fa guadagnare XP e sblocca distintivi e livelli. Nel profilo trovi distintivi e missioni in sezioni richiudibili, con le tue statistiche di km e tempo di guida.',
   },
   {
     ic: 'lock',
     title: 'Privacy sotto controllo',
-    text: 'La tua posizione è condivisa solo se lo attivi tu. Puoi cambiare visibilità e preferenze quando vuoi da Impostazioni. Buon viaggio!',
+    text: 'La tua posizione è condivisa solo se lo attivi tu, e agli sconosciuti appari solo dal livello 5. Puoi entrare con email o con Google e cambiare ogni preferenza da Impostazioni. Buon viaggio!',
   },
 ];
 

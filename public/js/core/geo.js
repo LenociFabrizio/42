@@ -149,20 +149,103 @@ export class GpsTracker {
  * @param {Array<{lat:number,lng:number}>} waypoints  almeno 2
  * @param {string} profile  'driving' (default) | 'bike' | 'foot'
  */
-export async function roadRoute(waypoints, profile = 'driving') {
+/**
+ * Calcola un itinerario RISPETTANDO le preferenze di guida (evita pedaggi,
+ * autostrade, traghetti) con Valhalla, che le supporta davvero — a differenza
+ * del server OSRM pubblico, che rifiuta il parametro `exclude`.
+ *
+ * @param {Array<{lat:number,lng:number}>} waypoints
+ * @param {object} o
+ * @param {boolean} [o.avoidTolls]
+ * @param {boolean} [o.avoidMotorways]
+ * @param {boolean} [o.avoidFerries]
+ * @param {'auto'|'motorcycle'} [o.costing]  modello di costo (auto o moto)
+ * @returns {Promise<{points:Array,distance_m:number,duration_s:number,engine:string}|null>}
+ */
+export async function navRoute(waypoints, { avoidTolls = false, avoidMotorways = false, avoidFerries = false, costing = 'auto' } = {}) {
+  if (!waypoints || waypoints.length < 2) return null;
+
+  const model = costing === 'motorcycle' ? 'motorcycle' : 'auto';
+  // In Valhalla i "use_*" sono propensioni 0..1: 0 = evita il più possibile.
+  const opts = {};
+  if (avoidTolls) opts.use_tolls = 0;
+  if (avoidMotorways) opts.use_highways = 0;
+  if (avoidFerries) opts.use_ferry = 0;
+
+  try {
+    const res = await fetch('https://valhalla1.openstreetmap.de/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locations: waypoints.map((p) => ({ lat: p.lat, lon: p.lng })),
+        costing: model,
+        costing_options: { [model]: opts },
+        directions_options: { units: 'kilometers' },
+      }),
+    });
+    if (!res.ok) throw new Error('valhalla');
+    const data = await res.json();
+    const trip = data.trip;
+    const shape = trip?.legs?.map((l) => l.shape).join('') || '';
+    if (!trip?.summary || !shape) throw new Error('valhalla-empty');
+    return {
+      // Valhalla codifica la shape con precisione 6 (non 5 come OSRM).
+      points: decodePolyline(shape, 6),
+      distance_m: Math.round((trip.summary.length || 0) * 1000),
+      duration_s: Math.round(trip.summary.time || 0),
+      engine: 'valhalla',
+      applied: Object.keys(opts),
+      dropped: [],
+    };
+  } catch {
+    // Valhalla non raggiungibile: ripieghiamo su OSRM (percorso più veloce,
+    // senza poter applicare le preferenze) segnalandolo al chiamante.
+    const r = await roadRoute(waypoints, 'driving');
+    if (!r) return null;
+    const wanted = [];
+    if (avoidTolls) wanted.push('toll');
+    if (avoidMotorways) wanted.push('motorway');
+    if (avoidFerries) wanted.push('ferry');
+    return { ...r, engine: 'osrm', applied: [], dropped: wanted };
+  }
+}
+
+export async function roadRoute(waypoints, profile = 'driving', { exclude = [] } = {}) {
   if (!waypoints || waypoints.length < 2) return null;
   const coords = waypoints.map((p) => `${p.lng},${p.lat}`).join(';');
-  const url = `https://router.project-osrm.org/route/v1/${profile}/${coords}?overview=full&geometries=polyline`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const r = data.routes && data.routes[0];
-    if (!r || !r.geometry) return null;
-    return { points: decodePolyline(r.geometry), distance_m: Math.round(r.distance), duration_s: Math.round(r.duration) };
-  } catch {
-    return null;
+
+  // OSRM accetta `exclude` solo per le classi previste dal profilo e non
+  // sempre in combinazione. Proviamo con tutte le esclusioni richieste e, se
+  // il router rifiuta, ne togliamo una alla volta finché la richiesta passa:
+  // meglio un percorso con qualche preferenza in meno che nessun percorso.
+  const attempts = [];
+  const list = [...new Set(exclude.filter(Boolean))];
+  for (let n = list.length; n > 0; n--) attempts.push(list.slice(0, n));
+  attempts.push([]); // ultimo tentativo: nessuna esclusione
+
+  for (const ex of attempts) {
+    const params = new URLSearchParams({ overview: 'full', geometries: 'polyline' });
+    if (ex.length) params.set('exclude', ex.join(','));
+    const url = `https://router.project-osrm.org/route/v1/${profile}/${coords}?${params}`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue; // esclusione non supportata: prova con meno vincoli
+      const data = await res.json();
+      const r = data.routes && data.routes[0];
+      if (!r || !r.geometry) continue;
+      return {
+        points: decodePolyline(r.geometry),
+        distance_m: Math.round(r.distance),
+        duration_s: Math.round(r.duration),
+        // Esclusioni effettivamente applicate e quelle cadute per strada.
+        applied: ex,
+        dropped: list.filter((x) => !ex.includes(x)),
+      };
+    } catch {
+      return null; // rete assente: inutile insistere
+    }
   }
+  return null;
 }
 
 /** Ottiene la posizione corrente una tantum (Promise). */

@@ -47,8 +47,14 @@ export function slugify(str = '') {
 /** Rimuove campi sensibili da un oggetto utente prima di inviarlo al client. */
 export function sanitizeUser(user) {
   if (!user) return null;
-  const { password_hash, ...safe } = user;
-  return safe;
+  // Mai esporre l'hash della password né l'id Google: al loro posto due flag
+  // utili al client (es. impostazioni: "accedi con Google", "imposta password").
+  const { password_hash, google_id, ...safe } = user;
+  return {
+    ...safe,
+    has_password: !!password_hash,
+    google_linked: !!google_id,
+  };
 }
 
 /**

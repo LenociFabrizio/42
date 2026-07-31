@@ -5,7 +5,7 @@
  * ------------------------------------------------------------
  */
 import { Router } from 'express';
-import { setLive, updatePosition, stop, nearby } from '../controllers/liveController.js';
+import { setLive, updatePosition, setVehicle, stop, nearby } from '../controllers/liveController.js';
 import { requireAuth } from '../middleware/auth.js';
 import { liveLimiter } from '../middleware/rateLimit.js';
 
@@ -15,6 +15,7 @@ const router = Router();
 // minimo per gli sconosciuti è applicato dentro `nearby` (visibilità 'public').
 router.put('/settings', requireAuth, setLive);
 router.post('/position', requireAuth, liveLimiter, updatePosition);
+router.post('/vehicle', requireAuth, setVehicle);
 router.post('/stop', requireAuth, stop);
 router.get('/nearby', requireAuth, nearby);
 

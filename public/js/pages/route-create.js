@@ -9,7 +9,7 @@ import { guard } from '../core/auth.js';
 import { registerPWA } from '../core/pwa.js';
 import { createMap, setRouteLine, addMarker } from '../core/map.js';
 import { getCurrentPosition, haversine, roadRoute } from '../core/geo.js';
-import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, ROUTE_VEHICLE_TYPES } from '../core/constants.js';
+import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, ROUTE_VEHICLE_TYPES, MIN_ROUTE_DISTANCE_M } from '../core/constants.js';
 import { $, svg, el, loader, toast, modal, fmtDistance, fmtDuration } from '../core/ui.js';
 import { buildPrivacyControl } from '../core/visibility.js';
 import api from '../core/api.js';
@@ -69,6 +69,8 @@ async function recompute() {
 
   if (waypoints.length < 2) {
     routeGeom = [];
+    onRoad = false;
+    distanceM = 0;
     clearLine();
     updateStats(0, false, false);
     return;
@@ -108,22 +110,59 @@ function straightDistance() {
   return Math.round(d);
 }
 
+/** true se il tracciato attuale è salvabile (2+ punti e lunghezza minima). */
+function isValidRoute() {
+  return waypoints.length >= 2 && routeGeom.length >= 2 && distanceM >= MIN_ROUTE_DISTANCE_M;
+}
+
 function updateStats(dist, road, loading) {
-  $('#pt-count').textContent = waypoints.length;
-  $('#pt-dist').textContent = fmtDistance(dist);
+  const count = $('#pt-count');
+  if (count) count.textContent = waypoints.length;
+  const distEl = $('#pt-dist');
+  if (distEl) distEl.textContent = fmtDistance(dist);
+
   const badge = $('#road-badge');
-  if (loading) { badge.textContent = 'calcolo su strada…'; badge.className = 'pill gray'; }
-  else if (road) { badge.textContent = 'su strada'; badge.className = 'pill green'; }
-  else if (waypoints.length >= 2) { badge.textContent = 'linea diretta'; badge.className = 'pill gray'; }
-  else { badge.textContent = ''; badge.className = 'pill gray'; badge.style.display = waypoints.length >= 2 ? '' : 'none'; }
-  if (waypoints.length >= 2) badge.style.display = '';
-  $('#btn-undo').disabled = waypoints.length === 0;
-  $('#btn-continue').disabled = waypoints.length < 2;
+  if (badge) {
+    if (loading) { badge.textContent = 'calcolo su strada…'; badge.className = 'pill gray'; }
+    else if (road) { badge.textContent = 'su strada'; badge.className = 'pill green'; }
+    else if (waypoints.length >= 2) { badge.textContent = 'linea diretta'; badge.className = 'pill gray'; }
+    else { badge.textContent = ''; badge.className = 'pill gray'; }
+    badge.style.display = waypoints.length >= 2 ? '' : 'none';
+  }
+
+  // Messaggio informativo sulla lunghezza minima richiesta.
+  const info = $('#min-info');
+  if (info) {
+    const minKm = MIN_ROUTE_DISTANCE_M / 1000;
+    if (waypoints.length < 2) {
+      info.innerHTML = `Il percorso deve essere lungo almeno <b>${minKm} km</b>.`;
+      info.style.color = '';
+    } else if (dist < MIN_ROUTE_DISTANCE_M) {
+      const missing = fmtDistance(MIN_ROUTE_DISTANCE_M - dist);
+      info.innerHTML = `Minimo <b>${minKm} km</b>: aggiungi altri <b>${missing}</b> per continuare.`;
+      info.style.color = 'var(--warning, #ffb020)';
+    } else {
+      info.innerHTML = `Lunghezza minima raggiunta: puoi confermare il percorso. ✅`;
+      info.style.color = 'var(--success, #29c46a)';
+    }
+  }
+
+  const undoBtn = $('#btn-undo');
+  if (undoBtn) undoBtn.disabled = waypoints.length === 0;
+  const contBtn = $('#btn-continue');
+  if (contBtn) contBtn.disabled = !isValidRoute();
 }
 
 /* -------------------- Salvataggio -------------------- */
 function openSaveSheet() {
-  if (waypoints.length < 2 || routeGeom.length < 2) return;
+  if (waypoints.length < 2 || routeGeom.length < 2) {
+    toast.warning('Aggiungi almeno due punti sulla mappa.');
+    return;
+  }
+  if (distanceM < MIN_ROUTE_DISTANCE_M) {
+    toast.warning(`Il percorso deve essere lungo almeno ${MIN_ROUTE_DISTANCE_M / 1000} km.`);
+    return;
+  }
   const dist = distanceM;
   const est = Math.round((dist / 1000 / 45) * 3600);
 

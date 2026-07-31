@@ -41,6 +41,13 @@ export const config = {
 
   clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
 
+  // Accesso con Google (Google Identity Services). Il Client ID è pubblico:
+  // viene esposto al client via /api/config. Se vuoto, il pulsante "Continua
+  // con Google" non viene mostrato e l'endpoint /auth/google risponde 503.
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+  },
+
   // Configurazione mappa esposta al client via /api/config.
   // Di default: tiles raster CARTO dark (gratuiti, nessuna chiave richiesta).
   map: {

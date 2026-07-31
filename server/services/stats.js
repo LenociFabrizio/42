@@ -53,6 +53,12 @@ export async function recomputeUserStats(userId) {
       events?.n || 0,
       userId
     );
+
+  // La distanza totale dei club è la somma di quelle dei membri: se cambia
+  // quella dell'utente, i club a cui appartiene vanno riallineati (altrimenti
+  // restano fermi al valore del momento dell'iscrizione).
+  const clubs = await db.prepare('SELECT club_id FROM club_members WHERE user_id = ?').all(userId);
+  for (const c of clubs) await recomputeClubStats(c.club_id);
 }
 
 /**

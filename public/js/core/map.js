@@ -143,6 +143,27 @@ export function addMarker(map, { lat, lng, className = 'mk route', html = '', po
   return marker;
 }
 
+/**
+ * Inquadra un raggio (in km) attorno a un punto: la vista mostra un'area di
+ * ~2×radiusKm di lato. Usa fitBounds, così il risultato è corretto su qualsiasi
+ * dimensione di schermo (a differenza di uno zoom fisso).
+ *
+ * @param {object} map
+ * @param {number} lat
+ * @param {number} lng
+ * @param {number} radiusKm  raggio desiderato
+ * @param {object} [opts]    { animate, padding, maxZoom }
+ */
+export function fitRadius(map, lat, lng, radiusKm, { animate = true, padding = 24, maxZoom = 17 } = {}) {
+  const maplibregl = window.maplibregl;
+  const km = Math.max(0.2, Number(radiusKm) || 5);
+  const dLat = km / 111.32;
+  const cos = Math.max(0.2, Math.cos((lat * Math.PI) / 180));
+  const dLng = km / (111.32 * cos);
+  const b = new maplibregl.LngLatBounds([lng - dLng, lat - dLat], [lng + dLng, lat + dLat]);
+  map.fitBounds(b, { padding, maxZoom, duration: animate ? 700 : 0 });
+}
+
 /** Adatta la vista a una lista di punti [[lat,lng],...]. */
 export function fitPoints(map, points, { padding = 60, maxZoom = 15 } = {}) {
   if (!points || !points.length) return;

@@ -106,6 +106,40 @@
 .gbadge.locked { opacity: 0.4; filter: grayscale(1); }
 .gbadge .nm { font-size: 0.76rem; font-weight: var(--fw-semibold); color: var(--text-mid); }
 
+/* Griglia distintivi: SEMPRE più elementi per riga, mai una colonna sola.
+   Le celle si adattano alla larghezza del contenitore (min 78px). */
+.badge-grid {
+  display: grid; gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+}
+@media (min-width: 480px) {
+  .badge-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+}
+.badge-grid .gbadge { min-width: 0; }
+.badge-grid .gbadge .ic { width: 54px; height: 54px; }
+.badge-grid .gbadge .nm {
+  width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ---------------- Sezione richiudibile (card espandibile) ----------------
+   Usa <details>/<summary>: apertura/chiusura native, accessibili da tastiera. */
+.collapse > summary {
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; list-style: none; padding: 2px 0;
+  font-size: 1.05rem; font-weight: var(--fw-semibold); color: var(--text-hi);
+}
+.collapse > summary::-webkit-details-marker { display: none; }
+.collapse > summary .cl-chev {
+  margin-left: auto; display: flex; color: var(--text-lo);
+  transition: transform var(--t-fast);
+}
+.collapse[open] > summary .cl-chev { transform: rotate(180deg); }
+.collapse > summary .cl-count {
+  font-size: 0.72rem; font-weight: var(--fw-semibold); color: var(--text-mid);
+  background: var(--bg-200); border-radius: var(--r-pill); padding: 2px 8px;
+}
+.collapse > .cl-body { margin-top: var(--sp-3); }
+
 /* Pill di stato / ruolo */
 .pill { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:var(--r-pill); font-size:0.72rem; font-weight:var(--fw-semibold); text-transform:uppercase; letter-spacing:0.04em; }
 .pill.accent { background: var(--accent-dim); color: var(--accent); }
@@ -153,10 +187,25 @@
 .tile .body h3 { font-size: 1.05rem; }
 
 /* ---------------- Segmented control ---------------- */
-.segmented { display: inline-flex; background: var(--bg-050); border: 1px solid var(--border); border-radius: var(--r-md); padding: 3px; gap: 3px; }
+.segmented { display: inline-flex; max-width: 100%; background: var(--bg-050); border: 1px solid var(--border); border-radius: var(--r-md); padding: 3px; gap: 3px; }
 .segmented button { flex: 1; border: none; background: none; color: var(--text-lo); padding: 9px 14px; border-radius: calc(var(--r-md) - 3px); font-weight: var(--fw-semibold); font-size: 0.9rem; transition: all var(--t-fast); }
 .segmented button.active { background: var(--accent); color: #120a00; }
 .segmented.block { display: flex; width: 100%; }
+
+/* Con molte voci (es. i 5 filtri difficoltà: Tutte/facile/media/difficile/estrema)
+   la larghezza minima automatica delle parole impedisce a flex di restringere i
+   bottoni: il gruppo sbordava dal contenitore facendo scorrere la pagina in
+   orizzontale. min-width:0 sblocca la contrazione; l'etichetta viene troncata
+   solo nel caso peggiore. */
+.segmented button {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 480px) {
+  .segmented button { padding: 9px 6px; font-size: 0.82rem; letter-spacing: -0.01em; }
+}
 
 /* ---------------- Empty state ---------------- */
 .empty { text-align: center; padding: var(--sp-7) var(--sp-4); color: var(--text-lo); }
@@ -164,6 +213,13 @@
 
 /* ---------------- Divider ---------------- */
 .divider { height: 1px; background: var(--border); margin: var(--sp-4) 0; border: none; }
+
+/* Separatore "oppure" (login/registrazione con Google). */
+.or-sep { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-4) 0; }
+.or-sep::before, .or-sep::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.or-sep span { color: var(--text-lo); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
+/* Slot del pulsante ufficiale Google (iframe/div renderizzato da GIS). */
+.google-btn-slot { display: flex; justify-content: center; min-height: 44px; }
 
 /* ---------------- Toast ---------------- */
 .toast-stack {
@@ -252,8 +308,34 @@
 .mk.club { background: #a06bff; }
 /* Marker utente live (pulsante) */
 .mk-user { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg-000); box-shadow: 0 0 0 4px var(--accent-glow); }
-.mk-friend { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--accent); overflow: hidden; box-shadow: var(--sh-md); background: var(--bg-150); }
+.mk-friend { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--accent); overflow: hidden; box-shadow: var(--sh-md); background: var(--bg-150); cursor: pointer; }
 .mk-friend img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ---------------- Popup mappa (tema app) ----------------
+   MapLibre disegna popup bianchi: qui li allineiamo al tema scuro/chiaro. */
+.maplibregl-popup-content {
+  background: var(--bg-100); color: var(--text-hi);
+  border: 1px solid var(--border-strong); border-radius: var(--r-lg);
+  padding: 10px 12px; box-shadow: var(--sh-lg); font-size: 0.86rem;
+}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: var(--border-strong); }
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: var(--border-strong); }
+.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--border-strong); }
+.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--border-strong); }
+
+/* Scheda utente live dentro il popup. */
+.live-popup { min-width: 176px; display: flex; flex-direction: column; gap: 6px; }
+.live-popup .lp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.live-popup .lp-avatar {
+  width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+  border: 2px solid var(--accent); background: var(--bg-150); flex: none;
+}
+.live-popup .lp-id { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.live-popup .lp-id strong { font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-popup .lp-row { display: flex; align-items: center; gap: 7px; line-height: 1.3; }
+.live-popup .lp-row svg { flex: none; color: var(--accent); }
+.live-popup .lp-muted { color: var(--text-lo); font-size: 0.78rem; }
+.live-popup .lp-row.lp-muted svg { color: var(--text-lo); }
 
 /* Griglia scelta (crea percorso/evento) */
 .choice { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
@@ -385,6 +467,20 @@
 .profile-nav .btn { flex-direction: column; gap: 6px; min-height: 68px; padding: 10px 6px; font-size: 0.82rem; }
 .profile-nav .btn svg { width: 22px; height: 22px; }
 
+/* Coppia di bottoni affiancati (es. "Modifica profilo" / "Password").
+   .btn ha white-space:nowrap: in una cella stretta l'etichetta lunga
+   uscirebbe dal bottone e la coppia risulterebbe disallineata. Qui le
+   celle possono restringersi e il testo va a capo o viene troncato. */
+.btn-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-2); }
+.btn-pair .btn {
+  min-width: 0; padding-inline: var(--sp-3);
+  white-space: normal; text-align: center; line-height: 1.2;
+}
+.btn-pair .btn svg { flex: none; }
+.btn-pair .btn > span {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+
 /* ---------------- Modalità Solo Mappa (stile minimappa NFS MW 2005) ---------------- */
 /* Vignette che scurisce i bordi e focalizza il centro (come la minimappa). */
 .drive-vignette {
@@ -396,6 +492,11 @@
 .drive-player { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 42; pointer-events: none; }
 .drive-player .drive-arrow { display: block; filter: drop-shadow(0 0 10px var(--accent-glow)); transition: transform 0.3s ease; transform-origin: center; }
 .drive-player svg { display: block; }
+/* Freccia del pilota come MARKER sulla mappa: ancorata alle coordinate reali,
+   quindi resta sul punto giusto anche mentre si zooma o si trascina. */
+.mk-drive { width: 44px; height: 44px; display: block; filter: drop-shadow(0 0 10px var(--accent-glow)); }
+.mk-drive .drive-arrow { display: block; transition: transform 0.3s ease; transform-origin: center; }
+.mk-drive svg { display: block; }
 /* HUD superiore: bussola centrale. */
 .drive-top { position: fixed; top: calc(var(--safe-top) + 14px); left: 0; right: 0; display: flex; justify-content: center; z-index: 44; pointer-events: none; }
 .drive-compass {

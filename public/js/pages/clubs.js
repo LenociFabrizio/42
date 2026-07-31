@@ -1,7 +1,7 @@
 /* =============================================================
    clubs.js — Social: esplora i Club, classifica globale e creazione.
    Tre schede (segmented): Esplora | Classifica | Crea.
-   Non è nella bottom nav → mountShell({ active: '' }).
+   È la voce in fondo a destra della bottom nav → active: 'clubs'.
    ============================================================= */
 import '../core/theme.js';
 import { guard } from '../core/auth.js';
@@ -25,7 +25,7 @@ async function main() {
   const user = await guard();
   if (!user) return;
   registerPWA();
-  mountShell({ active: '' });
+  mountShell({ active: 'clubs' });
   root = $('#root');
   renderShell();
   loader.hide();

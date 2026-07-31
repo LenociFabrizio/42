@@ -43,6 +43,10 @@ export const FRIEND_STATUS = {
 // Livello minimo per sbloccare la Live Map multiplayer (anti-spam / progressione).
 export const LIVE_MAP_MIN_LEVEL = 5;
 
+// Lunghezza minima di un percorso creato (metri). Deve restare allineata a
+// MIN_ROUTE_DISTANCE_M in public/js/core/constants.js.
+export const MIN_ROUTE_DISTANCE_M = 2000;
+
 // Ricompense XP di base per ogni azione (il "cuore" della gamification).
 // Mai pay-to-win: solo attività reale genera XP.
 export const XP = {

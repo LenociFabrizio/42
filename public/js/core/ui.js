@@ -184,6 +184,22 @@ export function timeAgo(iso) {
   return fmtDate(iso);
 }
 
+/**
+ * Durata trascorsa da un istante, in forma compatta ("da quanto è online").
+ * Es. "meno di 1 min", "12 min", "1 h 05 min", "2 g 3 h".
+ */
+export function fmtSince(iso) {
+  const d = parseDbDate(iso);
+  if (isNaN(d)) return '—';
+  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (s < 60) return 'meno di 1 min';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h ${String(m % 60).padStart(2, '0')} min`;
+  return `${Math.floor(h / 24)} g ${h % 24} h`;
+}
+
 /** Iniziali per fallback avatar. */
 export function initials(name) {
   if (!name) return '?';

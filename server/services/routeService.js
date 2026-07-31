@@ -14,7 +14,7 @@
  */
 import db from '../database/db.js';
 import { HttpError } from '../utils/helpers.js';
-import { XP } from '../utils/constants.js';
+import { XP, MIN_ROUTE_DISTANCE_M } from '../utils/constants.js';
 import { trackMetrics, simplify, encodePolyline, bbox } from '../utils/geo.js';
 import { awardXp, bumpMissions, checkBadges } from './gamification.js';
 import { recomputeUserStats } from './stats.js';
@@ -28,6 +28,10 @@ export async function createRoute(userId, input) {
   const points = input.track; // già validati dal controller (v.track)
   const simplified = simplify(points);
   const metrics = trackMetrics(points);
+  // Lunghezza minima: il client la blocca già, ma la regola vale anche via API.
+  if (metrics.distance_m < MIN_ROUTE_DISTANCE_M) {
+    throw new HttpError(400, `Il percorso deve essere lungo almeno ${MIN_ROUTE_DISTANCE_M / 1000} km.`);
+  }
   const box = bbox(simplified) || {};
   const polyline = encodePolyline(simplified);
 
@@ -59,6 +63,32 @@ export async function createRoute(userId, input) {
       const t = String(tag).trim().toLowerCase().slice(0, 24);
       if (t) await db.prepare('INSERT OR IGNORE INTO route_tags (route_id, tag) VALUES (?, ?)').run(routeId, t);
     }
+  }
+
+  // Se il percorso nasce da una REGISTRAZIONE GPS (la traccia ha i timestamp,
+  // quindi moving_time_s > 0), il creatore lo ha appena GUIDATO: registriamo
+  // quel giro come suo primo completamento. Senza questo passaggio i km
+  // percorsi e il tempo di guida non entrerebbero mai nelle statistiche e il
+  // percorso resterebbe senza record ufficiale.
+  // I percorsi DISEGNATI sulla mappa non hanno timestamp: nessun completamento.
+  if (metrics.moving_time_s > 0) {
+    const timeMs = metrics.moving_time_s * 1000;
+    const avgSpeed = metrics.avg_speed_kmh || 0;
+    const maxSpeed = metrics.max_speed_kmh || avgSpeed;
+    const compInfo = await db
+      .prepare(
+        `INSERT INTO route_completions
+           (route_id, user_id, time_ms, distance_m, avg_speed_kmh, max_speed_kmh,
+            weather, vehicle_id, track_polyline, is_personal_best)
+         VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, 1)`
+      )
+      .run(routeId, userId, timeMs, metrics.distance_m, avgSpeed, maxSpeed, input.vehicle_id || null, polyline);
+    // Primo giro del creatore = record ufficiale del percorso (regola di dominio).
+    await db
+      .prepare('UPDATE routes SET record_completion_id = ?, completions_count = completions_count + 1 WHERE id = ?')
+      .run(compInfo.lastInsertRowid, routeId);
+    await bumpMissions(userId, 'completions', 1);
+    await bumpMissions(userId, 'distance_m', metrics.distance_m || 0);
   }
 
   // Ricompense

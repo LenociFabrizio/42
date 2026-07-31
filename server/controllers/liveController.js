@@ -25,14 +25,22 @@ export const setLive = asyncHandler(async (req, res) => {
   const enabled = v.bool(req.body.live_enabled);
 
   if (enabled) {
+    // live_since = inizio della sessione online (mostrato agli altri come
+    // "online da…"). Non lo azzeriamo se la condivisione era già attiva.
     await db
-      .prepare("UPDATE users SET live_enabled = 1, updated_at = datetime('now') WHERE id = ?")
+      .prepare(
+        `UPDATE users SET live_enabled = 1,
+                live_since = COALESCE(CASE WHEN live_enabled = 1 THEN live_since END, datetime('now')),
+                updated_at = datetime('now')
+           WHERE id = ?`
+      )
       .run(req.user.id);
   } else {
     await db
       .prepare(
         `UPDATE users SET live_enabled = 0, last_lat = NULL, last_lng = NULL,
                 last_speed = NULL, last_heading = NULL, last_seen = NULL,
+                live_since = NULL, live_vehicle_id = NULL,
                 updated_at = datetime('now')
            WHERE id = ?`
       )
@@ -54,15 +62,50 @@ export const updatePosition = asyncHandler(async (req, res) => {
   const speed = v.num(req.body.speed, 'Velocità', { min: 0, max: 500, def: null });
   const heading = v.num(req.body.heading, 'Direzione', { min: 0, max: 360, def: null });
 
+  // Veicolo in uso (opzionale): mostrato agli altri nel popup della live map.
+  // Deve appartenere a chi lo dichiara.
+  let vehicleId = null;
+  if (req.body.vehicle_id != null && req.body.vehicle_id !== '') {
+    vehicleId = v.int(req.body.vehicle_id, 'Veicolo', { min: 1 });
+    const owned = await db
+      .prepare('SELECT id FROM vehicles WHERE id = ? AND user_id = ?')
+      .get(vehicleId, req.user.id);
+    if (!owned) throw new HttpError(404, 'Veicolo non trovato.');
+  }
+
+  // live_since: se la sessione precedente è scaduta (nessun ping da oltre 5
+  // minuti, la stessa soglia di `nearby`), questa è una NUOVA sessione online.
   await db
     .prepare(
       `UPDATE users SET last_lat = ?, last_lng = ?, last_speed = ?, last_heading = ?,
+              live_vehicle_id = COALESCE(?, live_vehicle_id),
+              live_since = CASE
+                WHEN live_since IS NULL OR last_seen IS NULL
+                  OR last_seen < datetime('now', '-5 minutes')
+                THEN datetime('now') ELSE live_since END,
               last_seen = datetime('now'), updated_at = datetime('now')
          WHERE id = ?`
     )
-    .run(lat, lng, speed, heading, req.user.id);
+    .run(lat, lng, speed, heading, vehicleId, req.user.id);
 
   res.json({ ok: true });
+});
+
+/**
+ * POST /api/live/vehicle — dichiara il veicolo che si sta guidando.
+ * È l'informazione mostrata agli altri nel popup della live map.
+ */
+export const setVehicle = asyncHandler(async (req, res) => {
+  const vehicleId = v.int(req.body.vehicle_id, 'Veicolo', { min: 1 });
+  const owned = await db
+    .prepare('SELECT id FROM vehicles WHERE id = ? AND user_id = ?')
+    .get(vehicleId, req.user.id);
+  if (!owned) throw new HttpError(404, 'Veicolo non trovato.');
+
+  await db
+    .prepare("UPDATE users SET live_vehicle_id = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(vehicleId, req.user.id);
+  res.json({ live_vehicle_id: vehicleId });
 });
 
 /** POST /api/live/stop — disattiva la condivisione e cancella la posizione. */
@@ -131,12 +174,24 @@ export const nearby = asyncHandler(async (req, res) => {
   // Ordine dei parametri: friend(amico) x2, poi livello, poi friend(sconosciuto) x2.
   args.push(req.user.id, req.user.id, LIVE_MAP_MIN_LEVEL, req.user.id, req.user.id);
 
+  // Veicolo mostrato: quello dichiarato in guida (live_vehicle_id) oppure,
+  // in mancanza, il veicolo principale del profilo.
   const rows = await db
     .prepare(
       `SELECT u.id, u.nickname, u.avatar, u.level,
-              u.last_lat, u.last_lng, u.last_speed, u.last_heading, u.last_seen
+              u.last_lat, u.last_lng, u.last_speed, u.last_heading, u.last_seen,
+              u.live_since,
+              COALESCE(dv.type, pv.type)   AS vehicle_type,
+              COALESCE(dv.name, pv.name)   AS vehicle_name,
+              COALESCE(dv.make, pv.make)   AS vehicle_make,
+              COALESCE(dv.model, pv.model) AS vehicle_model
          FROM users u
          LEFT JOIN user_settings us ON us.user_id = u.id
+         LEFT JOIN vehicles dv ON dv.id = u.live_vehicle_id AND dv.user_id = u.id
+         LEFT JOIN vehicles pv ON pv.id = (
+                SELECT id FROM vehicles WHERE user_id = u.id
+                 ORDER BY is_primary DESC, id LIMIT 1
+              )
         WHERE ${where.join(' AND ')}
         ORDER BY u.last_seen DESC`
     )

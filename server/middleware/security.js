@@ -15,6 +15,8 @@
 import helmet from 'helmet';
 
 const CDN = ['https://unpkg.com', 'https://cdn.jsdelivr.net'];
+// Google Identity Services (pulsante "Continua con Google"): script + iframe.
+const GOOGLE_AUTH = ['https://accounts.google.com', 'https://apis.google.com'];
 
 export function securityHeaders() {
   return helmet({
@@ -27,9 +29,9 @@ export function securityHeaders() {
       directives: {
         defaultSrc: ["'self'"],
         // Gli script dell'app sono locali; MapLibre arriva dai CDN sopra.
-        scriptSrc: ["'self'", ...CDN],
+        scriptSrc: ["'self'", ...CDN, ...GOOGLE_AUTH],
         // 'unsafe-inline' per gli stili inline usati nei componenti UI.
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', ...CDN],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', ...CDN, ...GOOGLE_AUTH],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
         // Tiles e avatar: immagini da qualsiasi https + data/blob (canvas, ImageBitmap).
         imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
@@ -37,7 +39,9 @@ export function securityHeaders() {
         connectSrc: ["'self'", 'https:'],
         // MapLibre istanzia i propri worker da blob URL.
         workerSrc: ["'self'", 'blob:'],
-        childSrc: ["'self'", 'blob:'],
+        childSrc: ["'self'", 'blob:', ...GOOGLE_AUTH],
+        // GIS apre il flusso di accesso in un iframe di accounts.google.com.
+        frameSrc: ["'self'", 'blob:', ...GOOGLE_AUTH],
         manifestSrc: ["'self'"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],

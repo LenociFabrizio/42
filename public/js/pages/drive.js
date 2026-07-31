@@ -8,9 +8,11 @@
 import '../core/theme.js';
 import { guard } from '../core/auth.js';
 import { registerPWA } from '../core/pwa.js';
-import { createMap } from '../core/map.js';
-import { $, svg, loader, toast } from '../core/ui.js';
+import { createMap, addMarker, viewportBbox } from '../core/map.js';
+import { $, svg, loader, toast, debounce, esc } from '../core/ui.js';
+import { catIcon } from '../core/constants.js';
 import { TrackingSession, bgEnabled } from '../core/tracking.js';
+import api from '../core/api.js';
 
 let map;
 let watchId = null;
@@ -18,7 +20,18 @@ let headingUp = true;
 let lastBearing = 0;
 let prev = null; // ultima posizione per calcolare la direzione se manca il course GPS
 let follow = true;
+let playerMarker = null;
+// Percorsi ed eventi mostrati anche in Solo Mappa.
+const poiMarkers = { routes: new Map(), events: new Map() };
 const session = new TrackingSession({ label: 'Modalità Solo Mappa attiva: la tua posizione è in uso.' });
+
+/** Freccia del pilota: marker ancorato alle coordinate GPS. */
+const ARROW_HTML = `
+  <span class="drive-arrow">
+    <svg viewBox="0 0 24 24" width="44" height="44" fill="none">
+      <path d="M12 2 4.5 21 12 17.4 19.5 21 12 2Z" fill="#ffb020" stroke="#120a00" stroke-width="1.3" stroke-linejoin="round" />
+    </svg>
+  </span>`;
 
 function bearingBetween(aLat, aLng, bLat, bLng) {
   const toRad = (d) => (d * Math.PI) / 180, toDeg = (r) => (r * 180) / Math.PI;
@@ -45,6 +58,10 @@ async function main() {
   // Se l'utente sposta la mappa manualmente, sospendi il "follow" finché non ricentra.
   map.on('dragstart', () => { follow = false; });
 
+  // Percorsi ed eventi visibili anche qui: si ricaricano quando cambia la vista.
+  map.on('load', loadNearbyContent);
+  map.on('moveend', debounce(loadNearbyContent, 500));
+
   await session.start();
   if (!('geolocation' in navigator)) { toast.error('Geolocalizzazione non supportata.'); return; }
   watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
@@ -65,6 +82,10 @@ function onPos(pos) {
   lastBearing = bearing;
   prev = { lat, lng };
 
+  // La freccia segue le COORDINATE, non il centro dello schermo.
+  if (playerMarker) playerMarker.setLngLat([lng, lat]);
+  else playerMarker = addMarker(map, { lat, lng, className: 'mk-drive', html: ARROW_HTML });
+
   applyOrientation(bearing, lat, lng);
   const kmh = typeof speed === 'number' && speed >= 0 ? Math.round(speed * 3.6) : null;
   $('#spd').textContent = kmh == null ? '0' : kmh;
@@ -75,12 +96,44 @@ function applyOrientation(bearing, lat, lng) {
   if (follow && lat != null) opts.center = [lng, lat];
   opts.bearing = headingUp ? bearing : 0;
   map.easeTo(opts);
-  // La freccia del giocatore: in heading-up punta sempre in alto; in nord-in-alto ruota verso la direzione.
-  const arrow = document.querySelector('.drive-arrow');
+  // La freccia: in heading-up la mappa è già ruotata, quindi punta in alto; in
+  // nord-in-alto è la freccia a ruotare verso la direzione di marcia.
+  const arrow = playerMarker?.getElement()?.querySelector('.drive-arrow');
   if (arrow) arrow.style.transform = `rotate(${headingUp ? 0 : bearing}deg)`;
   // Bussola: in heading-up l'ago del nord ruota di -bearing; in nord-in-alto resta su.
   const needle = $('#needle');
   if (needle) needle.style.transform = `rotate(${headingUp ? -bearing : 0}deg)`;
+}
+
+/**
+ * Carica percorsi ed eventi nella vista corrente e li mostra come marker.
+ * Toccandoli si apre la relativa scheda.
+ */
+async function loadNearbyContent() {
+  if (!map) return;
+  const bbox = viewportBbox(map);
+  try {
+    const [r, e] = await Promise.all([
+      api.get('/routes', { bbox, limit: 60 }),
+      api.get('/events', { status: 'scheduled' }),
+    ]);
+    // Popup (non navigazione diretta): alla guida un tocco accidentale non
+    // deve buttarti fuori dalla minimappa. Il link è dentro il popup.
+    for (const rt of r.routes || []) {
+      if (poiMarkers.routes.has(rt.id)) continue;
+      poiMarkers.routes.set(rt.id, addMarker(map, {
+        lat: rt.start_lat, lng: rt.start_lng, className: 'mk route', html: svg(catIcon(rt.category), 14),
+        popupHtml: `<strong>${esc(rt.name)}</strong><br><a href="/route.html?id=${rt.id}">Apri percorso</a>`,
+      }));
+    }
+    for (const ev of e.events || []) {
+      if (poiMarkers.events.has(ev.id)) continue;
+      poiMarkers.events.set(ev.id, addMarker(map, {
+        lat: ev.area_lat, lng: ev.area_lng, className: 'mk event', html: svg('megaphone', 14),
+        popupHtml: `<strong>${esc(ev.name)}</strong><br><a href="/event.html?id=${ev.id}">Apri evento</a>`,
+      }));
+    }
+  } catch { /* offline: la minimappa resta usabile */ }
 }
 
 function toggleOrientation() {

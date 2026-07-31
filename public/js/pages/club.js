@@ -18,7 +18,7 @@ async function main() {
   const user = await guard();
   if (!user) return;
   registerPWA();
-  mountShell({ active: '' });
+  mountShell({ active: 'clubs' });
   root = $('#root');
   if (!clubId) {
     loader.hide();

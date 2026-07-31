@@ -121,6 +121,40 @@ async function runMigrations() {
   if (eventCols.length && !eventCols.some((c) => c.name === 'club_id')) {
     await db.run('ALTER TABLE events ADD COLUMN club_id INTEGER');
   }
+
+  // Accesso con Google + stato della sessione live (da quando è online e con
+  // quale veicolo sta guidando: mostrati nel popup della live map).
+  const userCols = await db.all('PRAGMA table_info(users)');
+  const hasUserCol = (name) => userCols.some((c) => c.name === name);
+  if (userCols.length && !hasUserCol('google_id')) {
+    await db.run('ALTER TABLE users ADD COLUMN google_id TEXT');
+    await db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google ON users(google_id)');
+  }
+  if (userCols.length && !hasUserCol('live_since')) {
+    await db.run('ALTER TABLE users ADD COLUMN live_since TEXT');
+  }
+  if (userCols.length && !hasUserCol('live_vehicle_id')) {
+    await db.run('ALTER TABLE users ADD COLUMN live_vehicle_id INTEGER');
+  }
+
+  // Preferenze di navigazione (evita pedaggi, autostrade, ZTL, traghetti).
+  const setCols = await db.all('PRAGMA table_info(user_settings)');
+  const NAV_COLS = [
+    ['nav_avoid_tolls', 'INTEGER NOT NULL DEFAULT 0'],
+    ['nav_avoid_motorways', 'INTEGER NOT NULL DEFAULT 0'],
+    ['nav_avoid_ztl', 'INTEGER NOT NULL DEFAULT 0'],
+    ['nav_avoid_ferries', 'INTEGER NOT NULL DEFAULT 0'],
+    ['nav_profile', "TEXT NOT NULL DEFAULT 'auto'"],
+    // Raggio di visibilità iniziale della mappa (km).
+    ['map_radius_km', 'INTEGER NOT NULL DEFAULT 5'],
+  ];
+  if (setCols.length) {
+    for (const [name, decl] of NAV_COLS) {
+      if (!setCols.some((c) => c.name === name)) {
+        await db.run(`ALTER TABLE user_settings ADD COLUMN ${name} ${decl}`);
+      }
+    }
+  }
 }
 
 export default db;

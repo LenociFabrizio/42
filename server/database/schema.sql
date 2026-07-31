@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS users (
   id                  INTEGER PRIMARY KEY AUTOINCREMENT,
   nickname            TEXT    NOT NULL UNIQUE,        -- univoco, nome pubblico
   email               TEXT    NOT NULL UNIQUE,
-  password_hash       TEXT    NOT NULL,
+  password_hash       TEXT    NOT NULL,                  -- '' se l'accesso è solo con Google
+  google_id           TEXT    UNIQUE,                    -- 'sub' dell'account Google collegato
   avatar              TEXT    DEFAULT '/images/avatars/default.svg',
   bio                 TEXT    DEFAULT '',
   role                TEXT    NOT NULL DEFAULT 'user', -- 'user' | 'admin'
@@ -38,6 +39,8 @@ CREATE TABLE IF NOT EXISTS users (
   last_speed          REAL,
   last_heading        REAL,
   last_seen           TEXT,
+  live_since          TEXT,                            -- inizio della sessione online corrente
+  live_vehicle_id     INTEGER,                         -- veicolo che sta guidando adesso
   is_active           INTEGER NOT NULL DEFAULT 1,
   created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -58,6 +61,14 @@ CREATE TABLE IF NOT EXISTS user_settings (
   notify_events       INTEGER NOT NULL DEFAULT 1,
   notify_records      INTEGER NOT NULL DEFAULT 1,
   notify_clubs        INTEGER NOT NULL DEFAULT 1,
+  -- Preferenze di navigazione (indicazioni verso percorsi/eventi)
+  nav_avoid_tolls     INTEGER NOT NULL DEFAULT 0,       -- evita pedaggi/autostrade a pagamento
+  nav_avoid_motorways INTEGER NOT NULL DEFAULT 0,       -- evita autostrade
+  nav_avoid_ztl       INTEGER NOT NULL DEFAULT 0,       -- evita ZTL / aree a traffico limitato
+  nav_avoid_ferries   INTEGER NOT NULL DEFAULT 0,       -- evita traghetti
+  nav_profile         TEXT    NOT NULL DEFAULT 'auto',  -- 'auto' | 'car' | 'moto'
+  -- Raggio di visibilità iniziale della mappa, in km (quanto "vicino" parte)
+  map_radius_km       INTEGER NOT NULL DEFAULT 5,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 

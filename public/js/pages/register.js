@@ -6,9 +6,25 @@ import { initConsent } from '../core/consent.js';
 import { markTutorialPending } from '../core/onboarding.js';
 import { stampVersion } from '../core/version.js';
 
+import { mountGoogleButton } from '../core/googleAuth.js';
+
 if (auth.isLogged()) location.href = '/index.html';
 initConsent();
 stampVersion();
+
+// Registrazione con Google (mostrata solo se configurata lato server).
+mountGoogleButton({
+  slot: $('#google-btn'),
+  wrapper: $('#google-wrap'),
+  onSuccess: (_user, created) => {
+    if (created) {
+      markTutorialPending();
+      toast.success('Benvenuto in 4 & | 2! +100 XP 🎉');
+    }
+    setTimeout(() => (location.href = '/index.html'), created ? 700 : 0);
+  },
+  onError: (err) => toast.error(err.message || 'Registrazione con Google non riuscita.'),
+});
 
 const form = $('#register-form');
 form.addEventListener('submit', async (e) => {
