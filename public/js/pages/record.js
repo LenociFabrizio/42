@@ -13,6 +13,8 @@ import { GpsTracker, getCurrentPosition } from '../core/geo.js';
 import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, ROUTE_VEHICLE_TYPES } from '../core/constants.js';
 import { $, svg, el, loader, toast, modal, confirmDialog, fmtDistance, fmtDuration, fmtChrono, qs } from '../core/ui.js';
 import { TrackingSession } from '../core/tracking.js';
+import { startCountdown } from '../core/countdown.js';
+import { initSound } from '../core/sound.js';
 import { buildPrivacyControl } from '../core/visibility.js';
 import api from '../core/api.js';
 
@@ -51,9 +53,19 @@ async function main() {
   window.addEventListener('beforeunload', (e) => { if (state === 'recording' || state === 'paused') { e.preventDefault(); e.returnValue = ''; } });
 }
 
-function onMain() {
-  if (state === 'idle') startRec();
-  else stopRec();
+async function onMain() {
+  if (state !== 'idle') { stopRec(); return; }
+  // Countdown 3-2-1-VIA! con bip: si parte al segnale, non al tocco.
+  const btn = $('#btn-main');
+  btn.disabled = true;
+  state = 'starting'; // evita doppi avvii durante il conteggio
+  try {
+    await startCountdown();
+  } finally {
+    state = 'idle';
+    btn.disabled = false;
+  }
+  startRec();
 }
 
 function startRec() {

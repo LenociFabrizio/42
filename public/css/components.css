@@ -404,6 +404,37 @@
   transform-origin: left center; transform: scaleX(1);
 }
 
+/* ---------------- Countdown di partenza (3, 2, 1, VIA!) ---------------- */
+.countdown-overlay {
+  position: fixed; inset: 0; z-index: 1200;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-4);
+  background: rgba(6, 7, 10, 0.82);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  opacity: 0; transition: opacity var(--t-med);
+}
+.countdown-overlay.open { opacity: 1; }
+.countdown-overlay .cd-ring {
+  width: 190px; height: 190px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 3px solid var(--accent-dim);
+  box-shadow: 0 0 50px var(--accent-glow), inset 0 0 40px rgba(255, 176, 32, 0.08);
+}
+.countdown-overlay .cd-num {
+  font-family: var(--font-display); font-weight: var(--fw-bold);
+  font-size: 6.5rem; line-height: 1; color: var(--accent);
+  text-shadow: 0 0 26px var(--accent-glow);
+}
+.countdown-overlay .cd-num.go { font-size: 3.4rem; letter-spacing: 0.04em; color: var(--success); text-shadow: 0 0 26px rgba(41, 196, 106, 0.6); }
+.countdown-overlay .cd-hint { color: var(--text-mid); font-size: 0.9rem; }
+/* Pulsazione a ogni conteggio: parte grande e rientra. */
+.countdown-overlay .cd-num.pop { animation: cd-pop 0.6s cubic-bezier(0.2, 0.9, 0.2, 1); }
+.countdown-overlay .cd-num.go { animation: cd-go 0.5s cubic-bezier(0.2, 0.9, 0.2, 1); }
+@keyframes cd-pop { from { transform: scale(1.8); opacity: 0.2; } to { transform: scale(1); opacity: 1; } }
+@keyframes cd-go { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .countdown-overlay .cd-num.pop, .countdown-overlay .cd-num.go { animation: none; }
+}
+
 /* ---------------- Pagine legali (prosa leggibile) ---------------- */
 .legal { max-width: 760px; margin: 0 auto; padding: var(--sp-5) var(--sp-4) var(--sp-8); }
 .legal h1 { font-size: 1.9rem; margin-bottom: var(--sp-2); }

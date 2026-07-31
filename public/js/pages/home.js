@@ -12,7 +12,7 @@ import { getCurrentPosition, decodePolyline, haversine } from '../core/geo.js';
 import { maybeAutoStart } from '../core/onboarding.js';
 import { $, svg, loader, toast, modal, el, esc, fmtDistance, fmtDuration, fmtSpeed, fmtSince, debounce } from '../core/ui.js';
 import { catIcon, poiIcon, catLabel, vehIcon, DEFAULT_MAP_RADIUS_KM } from '../core/constants.js';
-import { initSound, playNotify } from '../core/sound.js';
+import { initSound, playNotify, playHorn } from '../core/sound.js';
 import { showDirections } from '../core/nav.js';
 import { showRideDisclaimer } from '../core/disclaimer.js';
 import api from '../core/api.js';
@@ -24,6 +24,7 @@ let watchId = null;
 let lastShareAt = 0;       // throttle invio posizione live
 
 let mapRadiusKm = DEFAULT_MAP_RADIUS_KM; // raggio di visibilità (Impostazioni)
+let myPos = null;          // ultima posizione nota (per il saluto col clacson)
 
 // Prossimità: raggio MASSIMO entro cui può comparire l'avviso (1 km) e
 // margine extra usato solo per farlo sparire senza sfarfallii.
@@ -62,6 +63,11 @@ async function main() {
     locate(false);
     reload();
     startWatch();
+    // Vicinanze: sempre in ascolto (serve al saluto col clacson), i marker
+    // compaiono solo col livello live attivo.
+    refreshLive();
+    clearInterval(home._liveTimer);
+    home._liveTimer = setInterval(refreshLive, 8000);
   });
   map.on('moveend', debounce(reload, 400));
 
@@ -76,6 +82,7 @@ function startWatch() {
   watchId = navigator.geolocation.watchPosition(
     (pos) => {
       const lat = pos.coords.latitude, lng = pos.coords.longitude;
+      myPos = { lat, lng };
       if (userMarker) userMarker.setLngLat([lng, lat]);
       else userMarker = addMarker(map, { lat, lng, className: 'mk-user pulse' });
       checkProximity(lat, lng);
@@ -227,7 +234,12 @@ function openEventSheet(ev) {
 }
 const stat = (v, k) => el('div', { class: 'stat' }, [el('div', { class: 'v', text: v }), el('div', { class: 'k', text: k })]);
 
-/** Attiva/disattiva il livello "live": mostra amici (sempre) e sconosciuti public. */
+/**
+ * Attiva/disattiva il livello "live": mostra amici (sempre) e sconosciuti public.
+ * Il polling delle vicinanze resta comunque attivo, perché serve al saluto col
+ * clacson quando si incrocia un altro pilota; qui cambia solo la visibilità
+ * dei marker sulla mappa.
+ */
 async function toggleLive() {
   const fab = $('#fab-live');
   liveOn = !liveOn;
@@ -235,11 +247,55 @@ async function toggleLive() {
   if (!liveOn) {
     markers.live.forEach((m) => m.remove());
     markers.live.clear();
-    clearInterval(home._liveTimer);
     return;
   }
   await refreshLive();
-  home._liveTimer = setInterval(refreshLive, 8000);
+}
+
+/* ---------------- Saluto col clacson ----------------
+ * Quando entri entro 100 m da un altro pilota suona un colpetto di clacson.
+ * Chi è già stato salutato NON viene risuonato: l'elenco vive in
+ * sessionStorage, così cambiando schermata e tornando sulla mappa il suono
+ * non si ripete. Ci si "riarma" solo quando quel pilota si allontana oltre
+ * la soglia di uscita (evita di suonare a ripetizione al limite dei 100 m).
+ */
+const HORN_RADIUS_M = 100;
+const HORN_EXIT_M = 250;
+const HORN_KEY = '4e2_horn_greeted';
+
+function greetedSet() {
+  try { return new Set(JSON.parse(sessionStorage.getItem(HORN_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function saveGreeted(set) {
+  try { sessionStorage.setItem(HORN_KEY, JSON.stringify([...set])); } catch { /* ignora */ }
+}
+
+function checkHorn(users) {
+  if (!myPos) return;
+  const greeted = greetedSet();
+  let changed = false;
+  let toGreet = 0;
+
+  for (const u of users) {
+    if (u.last_lat == null || u.last_lng == null) continue;
+    const d = haversine(myPos.lat, myPos.lng, u.last_lat, u.last_lng);
+    const id = String(u.id);
+    if (d <= HORN_RADIUS_M) {
+      if (!greeted.has(id)) { greeted.add(id); changed = true; toGreet++; }
+    } else if (d > HORN_EXIT_M && greeted.has(id)) {
+      // Si è allontanato: al prossimo incontro lo salutiamo di nuovo.
+      greeted.delete(id);
+      changed = true;
+    }
+  }
+
+  if (changed) saveGreeted(greeted);
+  // Un solo clacson anche se incroci più piloti insieme.
+  if (toGreet > 0) {
+    playHorn();
+    toast.info(toGreet === 1 ? 'Un pilota è qui vicino 👋' : `${toGreet} piloti qui vicino 👋`, { duration: 2500 });
+  }
 }
 
 /**
@@ -281,6 +337,9 @@ function livePopupHtml(u) {
 async function refreshLive() {
   try {
     const { users } = await api.get('/live/nearby', { bbox: viewportBbox(map) });
+    // Il clacson di saluto funziona anche col livello live spento.
+    checkHorn(users || []);
+    if (!liveOn) return;
     const seen = new Set();
     for (const u of users || []) {
       seen.add(u.id);

@@ -89,4 +89,41 @@ export function playNotify() {
   try { navigator.vibrate?.([40, 60, 40]); } catch { /* non supportato */ }
 }
 
-export default { initSound, playNotify, soundEnabled, setSoundEnabled };
+/**
+ * Bip del countdown di partenza. I tre conteggi sono note basse e secche,
+ * il "via!" è più alto e lungo: si distingue a orecchio senza guardare.
+ * @param {boolean} [go] true per il segnale di partenza
+ */
+export function playBeep(go = false) {
+  if (!soundEnabled()) return;
+  const c = audioCtx();
+  if (!c) return;
+  if (c.state === 'suspended') c.resume().catch(() => {});
+  try {
+    if (go) note(c, { freq: 1244.5, start: 0, duration: 0.6, gain: 0.26, type: 'square' });
+    else note(c, { freq: 622.25, start: 0, duration: 0.16, gain: 0.22, type: 'square' });
+  } catch { /* audio non disponibile */ }
+  try { navigator.vibrate?.(go ? 220 : 70); } catch { /* non supportato */ }
+}
+
+/**
+ * Colpetto di clacson: saluto quando incroci un altro pilota.
+ * Due note sovrapposte leggermente stonate (come un clacson vero), brevi.
+ */
+export function playHorn() {
+  if (!soundEnabled()) return;
+  const c = audioCtx();
+  if (!c) return;
+  if (c.state === 'suspended') c.resume().catch(() => {});
+  try {
+    // Intervallo di terza minore "sporco": timbro da clacson, non da campanello.
+    note(c, { freq: 440, start: 0, duration: 0.26, gain: 0.16, type: 'sawtooth' });
+    note(c, { freq: 523.25, start: 0, duration: 0.26, gain: 0.14, type: 'sawtooth' });
+    // Secondo colpetto, come un "bip-bip" di saluto.
+    note(c, { freq: 440, start: 0.3, duration: 0.22, gain: 0.14, type: 'sawtooth' });
+    note(c, { freq: 523.25, start: 0.3, duration: 0.22, gain: 0.12, type: 'sawtooth' });
+  } catch { /* audio non disponibile */ }
+  try { navigator.vibrate?.([50, 70, 50]); } catch { /* non supportato */ }
+}
+
+export default { initSound, playNotify, playBeep, playHorn, soundEnabled, setSoundEnabled };

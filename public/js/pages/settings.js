@@ -14,7 +14,7 @@ import { LIVE_MAP_MIN_LEVEL, MAP_RADIUS_OPTIONS, DEFAULT_MAP_RADIUS_KM } from '.
 import { startTutorial } from '../core/onboarding.js';
 import { bgEnabled, setBgEnabled } from '../core/tracking.js';
 import { resetNavPrefs } from '../core/nav.js';
-import { soundEnabled, setSoundEnabled, playNotify } from '../core/sound.js';
+import { soundEnabled, setSoundEnabled, playNotify, playBeep, playHorn, initSound } from '../core/sound.js';
 import api, { token } from '../core/api.js';
 
 const VIS = [
@@ -39,6 +39,7 @@ async function main() {
   if (!user) return;
   registerPWA();
   mountShell({ active: '' });
+  initSound(); // sblocca l'audio al primo tocco: le prove qui devono suonare
 
   const root = $('#root');
   root.append(el('h1', { text: 'Impostazioni', style: 'margin-bottom:var(--sp-4)' }));
@@ -64,6 +65,7 @@ function build(root, s, me) {
     liveCard(me),
     trackingCard(),
     notifyCard(s),
+    soundCard(),
     guideCard(),
     accountCard(me),
     el('div', { class: 'legal-footer', html: '<a href="/privacy.html">Privacy</a><a href="/cookie.html">Cookie</a><a href="/terms.html">Termini</a>' }),
@@ -257,20 +259,42 @@ function notifyCard(s) {
   ];
   const rows = items.map(([key, label]) => checkboxRow(label, s[key], (checked) => debouncedSave({ [key]: checked }, 'Notifiche aggiornate')));
 
-  // Suono degli avvisi di prossimità (percorso/evento vicino): preferenza locale
-  // al dispositivo, con anteprima immediata.
-  const sound = checkboxRow('Suono avvisi di prossimità', soundEnabled(), (checked) => {
-    setSoundEnabled(checked);
-    if (checked) playNotify();
-    toast.success(checked ? 'Suono attivato' : 'Suono disattivato', { duration: 1500 });
-  });
-
   return card('Notifiche', [
     el('div', { class: 'flex-col', style: 'gap:4px' }, rows),
-    el('hr', { class: 'divider' }),
-    sound,
-    el('div', { class: 'text-lo', style: 'font-size:.78rem;margin-top:6px', text: "Avviso acustico quando ti avvicini (entro 1 km) a un percorso o a un evento. Vale solo su questo dispositivo." }),
   ]);
+}
+
+/* -------------------- Suoni -------------------- */
+/**
+ * Interruttore generale dei suoni dell'app: silenzia (o riattiva) TUTTI i
+ * segnali acustici in un colpo. Preferenza locale al dispositivo.
+ */
+function soundCard() {
+  const master = checkboxRow('Suoni dell\'app attivi', soundEnabled(), (checked) => {
+    setSoundEnabled(checked);
+    if (checked) playNotify(); // anteprima: si sente subito che sono tornati
+    toast.success(checked ? 'Suoni attivati' : 'Tutti i suoni silenziati', { duration: 1600 });
+    // Aggiorna la riga di riepilogo e lo stato dei pulsanti di prova.
+    render();
+  });
+
+  const test = el('div', { class: 'flex gap-2 wrap', style: 'margin-top:10px' }, [
+    el('button', { class: 'btn btn-outline btn-sm', html: `${svg('bell', 16)} Avviso`, onClick: () => playNotify() }),
+    el('button', { class: 'btn btn-outline btn-sm', html: `${svg('flag', 16)} Partenza`, onClick: () => playBeep(true) }),
+    el('button', { class: 'btn btn-outline btn-sm', html: `${svg('users', 16)} Clacson`, onClick: () => playHorn() }),
+  ]);
+  const note = el('div', { class: 'text-lo', style: 'font-size:.78rem;margin-top:8px' });
+
+  function render() {
+    const on = soundEnabled();
+    note.textContent = on
+      ? 'Riguarda gli avvisi di prossimità (percorso o evento entro 1 km), il countdown di partenza e il clacson di saluto quando incroci un altro pilota. Vale solo su questo dispositivo.'
+      : 'Tutti i suoni sono silenziati: avvisi di prossimità, countdown di partenza e clacson di saluto. Vale solo su questo dispositivo.';
+    test.querySelectorAll('button').forEach((b) => { b.disabled = !on; });
+  }
+  render();
+
+  return card('Suoni', [master, note, test]);
 }
 
 /* -------------------- Account -------------------- */
