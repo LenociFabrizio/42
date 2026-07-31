@@ -792,6 +792,29 @@ body.radar-on .toast-stack { top: calc(var(--topbar-h) + var(--safe-top) + 82px)
 .areas-far .area-lock { padding: 5px; gap: 0; }
 .areas-far .area-lock b { display: none; }
 
+/* ---------------- Pannello sviluppatore (admin) ----------------
+   Grafici fatti con dei div: due schermate di numeri non giustificano una
+   libreria di grafici da caricare per tutti. */
+.adm-chart { display: flex; align-items: flex-end; gap: 4px; height: 130px; }
+.adm-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; }
+.adm-bar {
+  width: 100%; min-height: 3px; border-radius: 4px 4px 0 0;
+  background: linear-gradient(to top, var(--accent-strong), var(--accent));
+  position: relative; display: flex; justify-content: center;
+}
+.adm-bar-n {
+  position: absolute; top: -15px; font-size: 0.66rem; font-weight: var(--fw-bold);
+  color: var(--text-mid); font-variant-numeric: tabular-nums;
+}
+.adm-bar-day { font-size: 0.62rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+.adm-rows { display: flex; flex-direction: column; gap: 7px; }
+.adm-row { display: flex; align-items: center; gap: 8px; }
+.adm-row-k { flex: 0 0 38%; font-size: 0.8rem; color: var(--text-mid); text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-row-bar { flex: 1; height: 8px; border-radius: var(--r-pill); background: var(--gauge-track); overflow: hidden; }
+.adm-row-bar i { display: block; height: 100%; border-radius: var(--r-pill); background: var(--accent); }
+.adm-row-v { flex: none; font-size: 0.8rem; font-weight: var(--fw-semibold); color: var(--text-hi); font-variant-numeric: tabular-nums; }
+
 /* ---------------- Cornici per privacy (percorsi/eventi) ---------------- */
 .priv-private { border-color: var(--warning) !important; }
 .priv-club { border-color: #a06bff !important; box-shadow: 0 0 0 1px rgba(160, 107, 255, 0.22); }

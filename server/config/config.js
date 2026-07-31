@@ -41,6 +41,14 @@ export const config = {
 
   clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
 
+  // Amministratori: email (separate da virgola) che ottengono il ruolo 'admin'
+  // e con esso il pannello /admin.html. Stanno in una variabile d'ambiente e
+  // non nel codice, così un indirizzo personale non finisce nel repository.
+  adminEmails: String(process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+
   // Accesso con Google (Google Identity Services). Il Client ID è pubblico:
   // viene esposto al client via /api/config. Se vuoto, il pulsante "Continua
   // con Google" non viene mostrato e l'endpoint /auth/google risponde 503.

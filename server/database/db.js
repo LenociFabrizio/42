@@ -136,6 +136,7 @@ async function runMigrations() {
   await db.run('CREATE INDEX IF NOT EXISTS idx_routes_region ON routes(region)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_events_region ON events(region)');
   await backfillRegions();
+  await promoteAdmins();
 
   // Accesso con Google + stato della sessione live (da quando è online e con
   // quale veicolo sta guidando: mostrati nel popup della live map).
@@ -180,6 +181,26 @@ async function runMigrations() {
         await db.run(`ALTER TABLE user_settings ADD COLUMN ${name} ${decl}`);
       }
     }
+  }
+}
+
+/**
+ * Promuove ad amministratore gli account elencati in ADMIN_EMAILS (separati da
+ * virgola). Sta in una variabile d'ambiente e non nel codice per due motivi: un
+ * indirizzo personale non finisce in un repository pubblico, e l'elenco si
+ * cambia senza toccare il sorgente.
+ *
+ * Gira a ogni avvio: se l'account non esiste ancora (o si registrerà con
+ * Google), la promozione scatta al primo avvio utile senza bisogno di comandi.
+ */
+async function promoteAdmins() {
+  for (const email of config.adminEmails) {
+    try {
+      const info = await db
+        .prepare("UPDATE users SET role = 'admin' WHERE lower(email) = ? AND role != 'admin'")
+        .run(email);
+      if (info?.changes) console.log(`[db] ${email} è ora amministratore`);
+    } catch { /* utente non ancora registrato: si riprova al prossimo avvio */ }
   }
 }
 

@@ -14,6 +14,7 @@ import { progress, levelTitle } from '../utils/levels.js';
 import { awardXp, checkBadges, dailyCheckIn } from '../services/gamification.js';
 import { unreadCount } from '../services/notifications.js';
 import { verifyGoogleIdToken } from '../utils/googleAuth.js';
+import { promoteIfAdmin } from '../services/adminAccess.js';
 
 /** Costruisce la risposta arricchita dell'utente (con progresso livello). */
 function decorateUser(user) {
@@ -25,10 +26,16 @@ function decorateUser(user) {
   };
 }
 
-/** Risposta standard con token + utente. */
-function authResponse(res, user, status = 200, extra = {}) {
-  const token = signToken({ id: user.id, role: user.role });
-  res.status(status).json({ token, user: decorateUser(user), ...extra });
+/**
+ * Risposta standard con token + utente.
+ * Qui passa OGNI accesso (registrazione, login, Google): è il punto giusto per
+ * allineare il ruolo di amministratore, così basta rientrare nell'app perché
+ * ADMIN_EMAILS abbia effetto (in serverless non si può ordinare un riavvio).
+ */
+async function authResponse(res, user, status = 200, extra = {}) {
+  const fresh = await promoteIfAdmin(user);
+  const token = signToken({ id: fresh.id, role: fresh.role });
+  res.status(status).json({ token, user: decorateUser(fresh), ...extra });
 }
 
 /** POST /api/auth/register */
@@ -56,7 +63,7 @@ export const register = asyncHandler(async (req, res) => {
   await checkBadges(userId);
 
   const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
-  authResponse(res, user, 201);
+  await authResponse(res, user, 201);
 });
 
 /** POST /api/auth/login  (email + password) */
@@ -73,7 +80,7 @@ export const login = asyncHandler(async (req, res) => {
   // Check-in giornaliero (streak + XP di login) al momento dell'accesso.
   await dailyCheckIn(user.id);
   const fresh = await db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
-  authResponse(res, fresh);
+  await authResponse(res, fresh);
 });
 
 /* ------------------------------------------------------------------
@@ -150,7 +157,7 @@ export const googleAuth = asyncHandler(async (req, res) => {
 
   await dailyCheckIn(user.id);
   const fresh = await db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
-  authResponse(res, fresh, created ? 201 : 200, { created });
+  await authResponse(res, fresh, created ? 201 : 200, { created });
 });
 
 /** GET /api/auth/me  (utente corrente + notifiche non lette) */

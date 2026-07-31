@@ -19,6 +19,7 @@ import poiRoutes from './pois.js';
 import settingsRoutes from './settings.js';
 import feedbackRoutes from './feedback.js';
 import regionRoutes from './regions.js';
+import adminRoutes from './admin.js';
 
 const router = Router();
 
@@ -52,5 +53,6 @@ router.use('/pois', poiRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/feedback', feedbackRoutes);
 router.use('/regions', regionRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;

@@ -54,6 +54,19 @@ Settings → Environment Variables**):
 | `BLOB_READ_WRITE_TOKEN` | upload immagini (foto profilo, foto percorsi/eventi) | in locale si scrive in `public/uploads/`; su Vercel l'upload risponde **503** con un messaggio esplicito, perché il filesystem è in sola lettura |
 | `RESEND_API_KEY`, `MAIL_FROM`, `BUG_REPORT_TO` | invio email delle segnalazioni | la segnalazione resta solo a database |
 | `GOOGLE_CLIENT_ID` | accesso con Google | il pulsante Google non compare |
+| `ADMIN_EMAILS` | email (separate da virgola) promosse ad **admin**: sbloccano `/admin.html` | nessun amministratore, il pannello resta chiuso a tutti |
+
+### Pannello sviluppatore (`/admin.html`)
+
+Chi ha un'email in `ADMIN_EMAILS` diventa admin **al primo accesso** (e a ogni
+avvio del server, per gli account già esistenti): non serve nessun comando sul
+database. Da Impostazioni compare la scheda **Pannello**, con utenti (totali,
+attivi, nuovi, in strada ora), iscrizioni degli ultimi 14 giorni, contenuti
+creati, distribuzione per Area e le **segnalazioni di bug** — utili soprattutto
+finché `RESEND_API_KEY` non è configurata, perché altrimenti nessuno le legge.
+
+È tutto in **sola lettura**: un pannello che modifica o cancella va progettato
+con conferme e tracciabilità, e per capire l'andamento i numeri bastano.
 
 ### Foto profilo (Vercel Blob)
 
@@ -90,11 +103,11 @@ server/
                      # (record/PB), stats, notifications
   controllers/       # un controller per dominio
   routes/            # un router per dominio (montati in routes/index.js)
-api/index.js         # adapter serverless (deploy futuro)
+api/index.js         # adapter serverless (Vercel)
 public/
   index.html         # home mappa
   *.html             # pagine (login, register, record, routes, route, events,
-                     # event, event-create, clubs, club, friends, profile,
+                     # event, event-create, clubs, club, friends, profile, admin,
                      # notifications, settings)
   css/               # variables, base, layout, components, animations
   js/core/           # api, auth, ui, icons, map, geo, gamification, shell,
@@ -123,7 +136,7 @@ Dettagli sicurezza in [`SECURITY.md`](./SECURITY.md).
 
 ## API (panoramica)
 
-`/api/auth` · `/api/users` · `/api/routes` · `/api/events` · `/api/clubs` · `/api/friends` · `/api/gamification` · `/api/notifications` · `/api/live` · `/api/regions` · `/api/pois` · `/api/settings` · `/api/feedback` · `/api/config` · `/api/health`
+`/api/auth` · `/api/users` · `/api/routes` · `/api/events` · `/api/clubs` · `/api/friends` · `/api/gamification` · `/api/notifications` · `/api/live` · `/api/regions` · `/api/admin` · `/api/pois` · `/api/settings` · `/api/feedback` · `/api/config` · `/api/health`
 
 Tutte le rotte protette usano `Authorization: Bearer <jwt>`. Le risposte d'errore hanno forma `{ "error": "messaggio" }`.
 

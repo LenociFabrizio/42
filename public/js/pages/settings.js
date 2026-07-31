@@ -60,6 +60,9 @@ async function main() {
 
 function build(root, s, me) {
   root.append(
+    // Solo per chi sviluppa l'app: la scheda non esiste per gli altri (e le API
+    // del pannello sono comunque chiuse da requireAdmin lato server).
+    me.role === 'admin' ? adminCard() : null,
     appearanceCard(s),
     mapCard(s),
     navCard(s),
@@ -73,6 +76,14 @@ function build(root, s, me) {
     accountCard(me),
     el('div', { class: 'legal-footer', html: '<a href="/privacy.html">Privacy</a><a href="/cookie.html">Cookie</a><a href="/terms.html">Termini</a>' }),
   );
+}
+
+/* -------------------- Pannello sviluppatore -------------------- */
+function adminCard() {
+  return card('Pannello', [
+    el('p', { class: 'text-mid', style: 'margin-bottom:var(--sp-3)', text: 'Numeri dell\'app: utenti, attività, contenuti creati e segnalazioni ricevute.' }),
+    el('a', { class: 'btn btn-primary btn-block', href: '/admin.html', html: `${svg('gauge', 20)} Apri il pannello` }),
+  ]);
 }
 
 /* -------------------- Mappa -------------------- */

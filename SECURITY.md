@@ -7,6 +7,12 @@ Sintesi delle misure implementate. Principio guida: **mai fidarsi del client**.
 - Sessioni via **JWT** firmati (`JWT_SECRET`, scadenza configurabile). Middleware `requireAuth` / `optionalAuth` / `requireAdmin` / `requireLevel`.
 - La **Live Map** richiede sempre consenso esplicito (`live_enabled`, revocabile in un tocco) ed è uno **scambio alla pari**: chi non condivide non riceve posizioni. Il livello 5 non serve a condividere con gli **amici**: gate solo per essere visibili agli **sconosciuti** (visibilità `public`).
 
+## Pannello amministratore
+- `/api/admin/*` richiede `requireAuth` **e** `requireAdmin` (401 senza sessione, 403 senza ruolo): il pannello lato client è solo un'interfaccia, il permesso è del server.
+- Il ruolo non si assegna da nessuna richiesta HTTP: dipende da `ADMIN_EMAILS` (variabile d'ambiente), applicata all'avvio e al momento dell'accesso. Nessun indirizzo personale nel codice.
+- Tutte le rotte del pannello sono in **sola lettura**: nessuna modifica o cancellazione di dati altrui.
+- L'elenco utenti mostra le email: è il pannello del proprietario dell'app, indispensabile per dare assistenza su un account. La pagina è `noindex, nofollow`.
+
 ## Validazione input
 - Ogni endpoint valida e normalizza i dati con `server/utils/validate.js` (stringhe con min/max, email, nickname whitelist `[a-zA-Z0-9._-]`, interi/float con range, coordinate lat/lng, enum `oneOf`, date ISO, tracce GPS con limite di punti). Errori → `400` con messaggio chiaro.
 - Le tracce GPS sono limitate nel numero di punti (anti-abuso) e semplificate/filtrate lato server.
