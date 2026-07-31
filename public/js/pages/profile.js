@@ -374,22 +374,39 @@ function renderVehicleList(wrap, vehicles, isOwn) {
   }
 }
 
-function openVehicleModal(listWrap) {
+async function openVehicleModal(listWrap) {
   const typeSel = el('select', { class: 'select' });
   for (const t of VEHICLE_TYPES) typeSel.append(el('option', { value: t.v, text: t.l }));
   const nameInp = el('input', { class: 'input', maxlength: '60', placeholder: 'es. La mia Panigale' });
-  const makeInp = el('input', { class: 'input', maxlength: '40', placeholder: 'Marca' });
-  const modelInp = el('input', { class: 'input', maxlength: '40', placeholder: 'Modello' });
   const yearInp = el('input', { class: 'input', type: 'number', min: '1900', max: '2100', placeholder: 'Anno' });
   const primaryChk = el('input', { type: 'checkbox' });
 
+  // Marca e modello a tendina (elenco locale, vedi vehicle-catalog.js). Il
+  // modulo si carica solo qui: nel resto dell'app non serve, ed è l'unico posto
+  // dove si aggiunge un veicolo.
+  let makeModelFields;
+  try {
+    ({ makeModelFields } = await import('../core/vehicle-catalog.js'));
+  } catch {
+    // Senza rete al primo accesso il modulo non c'è ancora in cache. Aggiungere
+    // un veicolo richiede comunque una richiesta al server, quindi lo diciamo.
+    toast.error('Elenco marche non disponibile: riprova quando sei online.');
+    return;
+  }
+  // Il nome lo proponiamo noi ("Ducati Monster"): quasi sempre è quello che si
+  // scriverebbe, ma se lo si tocca non lo sovrascriviamo più.
+  let nameTouched = false;
+  nameInp.addEventListener('input', () => { nameTouched = true; });
+  const picker = makeModelFields({
+    type: typeSel.value,
+    onChange: (label) => { if (!nameTouched) nameInp.value = label; },
+  });
+  typeSel.addEventListener('change', () => picker.setType(typeSel.value));
+
   const body = el('div', {}, [
     el('div', { class: 'field' }, [el('label', { text: 'Tipo' }), typeSel]),
+    picker.fields,
     el('div', { class: 'field' }, [el('label', { text: 'Nome' }), nameInp]),
-    el('div', { class: 'grid grid-2' }, [
-      el('div', { class: 'field' }, [el('label', { text: 'Marca' }), makeInp]),
-      el('div', { class: 'field' }, [el('label', { text: 'Modello' }), modelInp]),
-    ]),
     el('div', { class: 'field' }, [el('label', { text: 'Anno' }), yearInp]),
     el('label', { class: 'checkbox' }, [primaryChk, el('span', { text: 'Imposta come veicolo principale' })]),
   ]);
@@ -397,15 +414,17 @@ function openVehicleModal(listWrap) {
   const m = modal({ title: 'Aggiungi veicolo', content: body, footer: [save] });
 
   save.addEventListener('click', async () => {
-    const name = nameInp.value.trim();
-    if (name.length < 2) { toast.error('Dai un nome al veicolo.'); return; }
+    const { make, model } = picker.values();
+    // Nome vuoto: se marca e modello ci sono, il nome ce l'abbiamo già.
+    const name = nameInp.value.trim() || [make, model].filter(Boolean).join(' ').trim();
+    if (name.length < 2) { toast.error('Scegli marca e modello, oppure dai un nome al veicolo.'); return; }
     save.disabled = true; save.textContent = 'Aggiunta…';
     try {
       await api.post('/users/me/vehicles', {
         type: typeSel.value,
         name,
-        make: makeInp.value.trim(),
-        model: modelInp.value.trim(),
+        make,
+        model,
         year: yearInp.value ? Number(yearInp.value) : null,
         is_primary: primaryChk.checked,
       });
