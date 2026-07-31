@@ -13,7 +13,7 @@ import { registerPWA } from '../core/pwa.js';
 import { xpMeter, levelTitle, ringPercent } from '../core/gamification.js';
 import { $, el, svg, loader, toast, modal, confirmDialog, fmtDistance, fmtDuration, fmtNum, qs } from '../core/ui.js';
 import { VEHICLE_TYPES, vehIcon, badgeIcon } from '../core/constants.js';
-import { cropAvatar } from '../core/avatar-crop.js';
+import { pickSquareImage } from '../core/avatar-crop.js';
 import api from '../core/api.js';
 
 const DEFAULT_AVATAR = '/images/avatars/default.svg';
@@ -233,35 +233,10 @@ function actionsCard() {
  * un vezzo: una foto da telefono pesa più del limite di richiesta della
  * funzione serverless, e caricata intera verrebbe respinta.
  */
-const MAX_PICK_BYTES = 25 * 1024 * 1024;
-
-/** Apre il selettore file e porta a termine il cambio foto. Ritorna l'URL. */
-function pickAvatar() {
-  const input = el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
-  document.body.append(input);
-  return new Promise((resolve) => {
-    input.addEventListener('change', async () => {
-      const file = input.files && input.files[0];
-      input.remove();
-      if (!file) { resolve(null); return; }
-      resolve(await uploadAvatar(file));
-    });
-    // Selettore chiuso senza scegliere: nessun evento 'change' arriva, quindi
-    // l'input resterebbe attaccato al DOM per sempre.
-    input.addEventListener('cancel', () => { input.remove(); resolve(null); });
-    input.click();
-  });
-}
-
-/** Ritaglia e carica la foto scelta. Ritorna l'URL nuovo, o null. */
-async function uploadAvatar(file) {
-  if (!file.type.startsWith('image/')) { toast.error('Serve un\'immagine (JPG, PNG o WEBP).'); return null; }
-  if (file.size > MAX_PICK_BYTES) { toast.error('Immagine troppo grande: scegline una sotto i 25 MB.'); return null; }
-
-  let blob;
-  try { blob = await cropAvatar(file); }
-  catch { toast.error('Immagine non leggibile: prova con un\'altra.'); return null; }
-  if (!blob) return null; // annullato dall'editor
+/** Scegli → inquadra → carica. Ritorna l'URL nuovo, o null. */
+async function pickAvatar() {
+  const blob = await pickSquareImage();
+  if (!blob) return null; // annullato, o file non adatto (l'avviso l'ha già dato)
 
   const fd = new FormData();
   fd.append('image', blob, 'avatar.jpg');

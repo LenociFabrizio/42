@@ -83,11 +83,25 @@
   flex-shrink: 0;
 }
 .avatar-ring img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 2px solid var(--bg-000); background: var(--bg-150); }
-/* La propria foto è toccabile: pastiglia con la macchina fotografica in basso a
-   destra, come su qualsiasi app dove l'avatar si cambia dall'avatar. */
-.avatar-ring.editable { position: relative; cursor: pointer; }
-.avatar-ring.editable:active { transform: scale(0.97); }
-.avatar-ring .avatar-cam {
+/* Immagine di un club: stessa forma di una foto profilo, così in elenco e in
+   scheda si riconosce come tale. Senza foto restano le iniziali del nome. */
+.club-logo-wrap { position: relative; flex: none; }
+.club-logo {
+  width: 100%; height: 100%; border-radius: 50%; display: block;
+  object-fit: cover; background: var(--bg-150);
+  border: 2px solid var(--accent);
+}
+.club-logo.fallback {
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: var(--fw-bold);
+  color: var(--accent); letter-spacing: 0.02em; line-height: 1;
+}
+
+/* La propria foto (e l'immagine del proprio club) è toccabile: pastiglia con la
+   macchina fotografica in basso a destra, dove la si cerca. */
+.avatar-ring.editable, .club-logo-wrap.editable { position: relative; cursor: pointer; }
+.avatar-ring.editable:active, .club-logo-wrap.editable:active { transform: scale(0.97); }
+.avatar-ring .avatar-cam, .club-logo-wrap .avatar-cam {
   position: absolute; right: -2px; bottom: -2px;
   width: 30px; height: 30px; border-radius: 50%;
   background: var(--accent); color: #120a00;

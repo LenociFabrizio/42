@@ -183,6 +183,12 @@
 .tile .cover { aspect-ratio: 16/10; background: var(--bg-200) center/cover; position: relative; }
 .tile .cover .overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(6,7,10,0.85), transparent 60%); }
 .tile .cover .badges { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 6px; }
+/* Fascia dei club: non una foto tagliata, ma l'immagine tonda al centro (come
+   una foto profilo) su un fondo che sale verso l'ambra. */
+.tile .cover.club-cover {
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 176, 32, 0.14), var(--bg-050) 70%);
+}
 .tile .body { padding: var(--sp-3); }
 .tile .body h3 { font-size: 1.05rem; }
 

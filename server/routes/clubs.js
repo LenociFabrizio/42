@@ -20,9 +20,11 @@ import {
   setMemberRole,
   kickMember,
   clubLeaderboard,
+  uploadPhoto,
 } from '../controllers/clubController.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { writeLimiter } from '../middleware/rateLimit.js';
+import { upload } from '../middleware/upload.js';
 
 const router = Router();
 
@@ -34,6 +36,8 @@ router.post('/', requireAuth, writeLimiter, create);
 router.get('/:id', optionalAuth, getOne);
 router.put('/:id', requireAuth, update);
 router.delete('/:id', requireAuth, remove);
+// Immagine del club: multipart, come l'avatar utente (il permesso è nel controller).
+router.post('/:id/photo', requireAuth, upload.single('image'), uploadPhoto);
 
 router.post('/:id/join', requireAuth, join);
 router.post('/:id/leave', requireAuth, leave);

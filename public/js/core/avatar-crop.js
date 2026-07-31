@@ -17,9 +17,10 @@
    colori di questo tema e lo zoom a pizzico, che su un'app mobile-first è
    il primo gesto che si prova.
    ============================================================= */
-import { modal } from './ui.js';
+import { modal, toast } from './ui.js';
 
 const OUTPUT_SIZE = 512;   // lato dell'immagine finale (px)
+const MAX_PICK_BYTES = 25 * 1024 * 1024; // tetto sul file scelto, prima del ritaglio
 const VIEWPORT = 272;      // lato dell'area di anteprima (px)
 const MAX_ZOOM = 4;        // zoom massimo rispetto al "riempi cornice"
 
@@ -213,6 +214,47 @@ export async function cropAvatar(file, opts = {}) {
       footer: [cancelBtn, okBtn],
       onClose: () => finish(null),
     });
+  });
+}
+
+/**
+ * Selettore file + editor in un colpo: usato per la foto profilo e per
+ * l'immagine del club, che hanno bisogno esattamente della stessa cosa (un
+ * quadrato leggero, già inquadrato).
+ * @param {{size?:number, quality?:number}} [opts]
+ * @returns {Promise<Blob|null>} null se l'utente annulla o il file non va bene
+ */
+export function pickSquareImage(opts = {}) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.style.display = 'none';
+  document.body.append(input);
+
+  return new Promise((resolve) => {
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (!file) { resolve(null); return; }
+      if (!file.type.startsWith('image/')) {
+        toast.error('Serve un\'immagine (JPG, PNG o WEBP).');
+        resolve(null);
+        return;
+      }
+      // Il ritaglio passa dal canvas: il limite serve solo a non far decodificare
+      // al telefono un file assurdo (l'immagine caricata poi pesa ~100 KB).
+      if (file.size > MAX_PICK_BYTES) {
+        toast.error('Immagine troppo grande: scegline una sotto i 25 MB.');
+        resolve(null);
+        return;
+      }
+      try { resolve(await cropAvatar(file, opts)); }
+      catch { toast.error('Immagine non leggibile: prova con un\'altra.'); resolve(null); }
+    });
+    // Selettore chiuso senza scegliere niente: senza questo l'input resterebbe
+    // attaccato al DOM per sempre.
+    input.addEventListener('cancel', () => { input.remove(); resolve(null); });
+    input.click();
   });
 }
 

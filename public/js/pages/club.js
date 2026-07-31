@@ -8,6 +8,8 @@ import { guard, auth } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
 import { $, el, svg, loader, toast, modal, confirmDialog, fmtDistance, fmtNum, timeAgo, qs } from '../core/ui.js';
+import { clubLogo, setClubLogo } from '../core/club-logo.js';
+import { pickSquareImage } from '../core/avatar-crop.js';
 import api from '../core/api.js';
 
 const DEFAULT_AVATAR = '/images/avatars/default.svg';
@@ -49,35 +51,40 @@ function render(detail, leaderboard) {
   const { club, members = [], is_member: isMember, my_role: myRole, pending_requests: pending = [] } = detail;
   const myId = auth.user?.id;
   root.innerHTML = '';
-  root.append(header(club));
+  root.append(header(club, myRole));
   root.append(actions(club, isMember, myRole));
   if ((myRole === 'creator' || myRole === 'moderator') && pending.length) root.append(requestsSection(pending));
   root.append(membersSection(members, myRole, myId, club));
   root.append(leaderboardSection(leaderboard));
 }
 
-/* -------------------- Intestazione -------------------- */
-function header(club) {
-  const cover = el('div', {
-    style: 'aspect-ratio:16/9;border-radius:var(--r-lg);overflow:hidden;background:var(--bg-200) center/cover',
-  });
-  if (club.photo) cover.style.backgroundImage = `url("${club.photo}")`;
-  else {
-    cover.style.cssText += ';display:flex;align-items:center;justify-content:center;font-size:3.4rem';
-    cover.append(el('span', { text: '🏛️' }));
-  }
+/* -------------------- Intestazione --------------------
+ * Stessa forma della scheda profilo: immagine tonda, nome, pastiglie, numeri.
+ * Al posto della fascia 16:9 con l'emoji del tempio, che era identica per tutti
+ * i club e non si poteva cambiare (mancava del tutto il caricamento).
+ */
+function header(club, myRole) {
+  const canEdit = myRole === 'creator' || myRole === 'moderator';
+  const logo = clubLogo(club, { size: 96, editable: canEdit });
+  if (canEdit) logo.addEventListener('click', () => changePhoto(logo, club));
 
   const privacy = club.privacy === 'private'
     ? el('span', { class: 'pill gray', text: 'Privato' })
     : el('span', { class: 'pill accent', text: 'Pubblico' });
 
-  return el('div', { class: 'mb-4' }, [
-    cover,
-    el('div', { class: 'flex items-center justify-between gap-2 mt-3' }, [
-      el('h1', { class: 'truncate', text: club.name }),
-      privacy,
+  return el('div', { class: 'card mb-4' }, [
+    el('div', { class: 'flex gap-3 items-center' }, [
+      logo,
+      el('div', { style: 'min-width:0;flex:1' }, [
+        el('h1', { class: 'truncate', text: club.name, style: 'font-size:1.5rem' }),
+        el('div', { class: 'flex gap-2 wrap mt-1' }, [
+          el('span', { class: 'pill accent', text: `Liv. ${club.level || 1}` }),
+          privacy,
+        ]),
+        canEdit ? el('div', { class: 'text-lo mt-1', style: 'font-size:.76rem', text: 'Tocca l\'immagine per cambiarla' }) : null,
+      ]),
     ]),
-    club.description ? el('p', { class: 'text-mid mt-2', text: club.description }) : null,
+    club.description ? el('p', { class: 'text-mid mt-3', text: club.description }) : null,
     el('div', { class: 'stats-row mt-3' }, [
       stat(fmtNum(club.members_count || 0), 'Membri'),
       stat(`${club.level || 1}`, 'Livello'),
@@ -85,6 +92,22 @@ function header(club) {
       stat(fmtNum(club.xp || 0), 'XP'),
     ]),
   ]);
+}
+
+/** Scegli → inquadra → carica l'immagine del club (creatore e moderatori). */
+async function changePhoto(logo, club) {
+  const blob = await pickSquareImage();
+  if (!blob) return; // annullato, o file non adatto (l'avviso l'ha già dato)
+  const fd = new FormData();
+  fd.append('image', blob, 'club.jpg');
+  try {
+    const { photo } = await api.upload(`/clubs/${clubId}/photo`, fd);
+    club.photo = photo;
+    setClubLogo(logo, photo);
+    toast.success('Immagine del club aggiornata!');
+  } catch (err) {
+    toast.error(err.message || 'Caricamento non riuscito.');
+  }
 }
 const stat = (v, k) => el('div', { class: 'stat' }, [el('div', { class: 'v', text: v }), el('div', { class: 'k', text: k })]);
 

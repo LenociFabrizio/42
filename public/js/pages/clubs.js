@@ -8,6 +8,7 @@ import { guard } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
 import { $, el, svg, loader, toast, fmtDistance, fmtNum, debounce, qs } from '../core/ui.js';
+import { clubLogo } from '../core/club-logo.js';
 import api from '../core/api.js';
 
 const SORTS = [
@@ -98,13 +99,9 @@ async function loadClubs(grid) {
 }
 
 function clubCard(cl) {
-  const cover = el('div', { class: 'cover' });
-  if (cl.photo) cover.style.backgroundImage = `url("${cl.photo}")`;
-  else {
-    cover.style.cssText += ';display:flex;align-items:center;justify-content:center;font-size:2.6rem';
-    cover.append(el('span', { text: '🏛️' }));
-  }
-  cover.append(el('div', { class: 'overlay' }));
+  // L'immagine del club sta al centro della fascia, tonda come una foto
+  // profilo: un club si riconosce dalla sua, non da un'emoji uguale per tutti.
+  const cover = el('div', { class: 'cover club-cover' }, [clubLogo(cl, { size: 78 })]);
   if (cl.is_member) {
     cover.append(el('div', { class: 'badges' }, [el('span', { class: 'pill green', text: 'Membro' })]));
   }
@@ -135,6 +132,7 @@ async function renderClassifica(c) {
 function lbRow(cl) {
   return el('a', { class: 'list-item', href: `/club.html?id=${cl.id}` }, [
     el('div', { class: `li-rank ${rankClass(cl.rank)}`, text: `${cl.rank}` }),
+    clubLogo(cl, { size: 38 }),
     el('div', { class: 'li-body' }, [
       el('div', { class: 'li-title truncate', text: cl.name }),
       el('div', { class: 'li-sub', text: `${fmtNum(cl.xp || 0)} XP · ${fmtDistance(cl.total_distance_m || 0)}` }),

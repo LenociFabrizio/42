@@ -13,6 +13,7 @@ import { CLUB_ROLES, PRIVACY, ROLES, XP } from '../utils/constants.js';
 import { awardXp, checkBadges } from '../services/gamification.js';
 import { notify } from '../services/notifications.js';
 import { recomputeClubStats } from '../services/stats.js';
+import { persistUpload, deleteUpload } from '../middleware/upload.js';
 
 /** Colonne "card" di un club per liste e classifiche. */
 const CARD_COLS = 'id, name, photo, description, privacy, level, xp, members_count, total_distance_m';
@@ -201,6 +202,29 @@ export const update = asyncHandler(async (req, res) => {
   res.json({ club: await db.prepare('SELECT * FROM clubs WHERE id = ?').get(id) });
 });
 
+/**
+ * POST /api/clubs/:id/photo — immagine del club (creatore o moderatore).
+ * Stesso giro dell'avatar utente: il client manda un JPEG già ritagliato
+ * quadrato (avatar-crop.js), qui si salva, si sostituisce e si cancella la
+ * precedente per non lasciare file orfani sullo storage.
+ */
+export const uploadPhoto = asyncHandler(async (req, res) => {
+  const id = v.int(req.params.id, 'id', { min: 1 });
+  const club = await getClubOr404(id);
+  const role = await memberRole(id, req.user.id);
+  if (role !== CLUB_ROLES.CREATOR && role !== CLUB_ROLES.MODERATOR) {
+    throw new HttpError(403, 'Solo il creatore o i moderatori possono cambiare l\'immagine del club.');
+  }
+  if (!req.file) throw new HttpError(400, 'Nessun file ricevuto.');
+
+  const url = await persistUpload(req.file, 'clubs');
+  await db.prepare('UPDATE clubs SET photo = ? WHERE id = ?').run(url, id);
+  // Solo dopo che la nuova è salva: un upload fallito non deve lasciare il club
+  // senza immagine.
+  if (club.photo && club.photo !== url) await deleteUpload(club.photo);
+  res.json({ photo: url });
+});
+
 /* -------------------- ELIMINAZIONE -------------------- */
 
 /** DELETE /api/clubs/:id — elimina il club (solo creatore o admin). */
@@ -210,7 +234,9 @@ export const remove = asyncHandler(async (req, res) => {
   if (club.creator_id !== req.user.id && req.user.role !== ROLES.ADMIN) {
     throw new HttpError(403, 'Non autorizzato.');
   }
-  // Il cascade dello schema rimuove membri e richieste collegate.
+  // Il cascade dello schema rimuove membri e richieste collegate, ma non
+  // l'immagine: quella vive sullo storage e va cancellata a mano.
+  await deleteUpload(club.photo);
   await db.prepare('DELETE FROM clubs WHERE id = ?').run(id);
   res.status(204).end();
 });

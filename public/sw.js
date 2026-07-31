@@ -6,7 +6,7 @@
      - Statici same-origin (css/js/img/font): stale-while-revalidate.
      - Cross-origin (tiles mappa, CDN): passthrough (rete).
    ============================================================= */
-const VERSION = 'v11';
+const VERSION = 'v12';
 const CACHE = `4e2-${VERSION}`;
 const CORE = [
   '/',
