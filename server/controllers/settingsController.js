@@ -8,6 +8,7 @@
 import db from '../database/db.js';
 import { asyncHandler, HttpError } from '../utils/helpers.js';
 import * as v from '../utils/validate.js';
+import { deleteUpload } from '../middleware/upload.js';
 import bcrypt from 'bcryptjs';
 
 /** Recupera la riga di impostazioni dell'utente, creandola coi default se assente. */
@@ -88,6 +89,10 @@ export const deleteAccount = asyncHandler(async (req, res) => {
     }
   }
 
+  // La foto profilo vive fuori dal database (Vercel Blob o public/uploads): il
+  // cascade delle FK non la tocca, e resterebbe in giro dopo la cancellazione
+  // dell'account. Prima il file, poi la riga.
+  await deleteUpload(req.user.avatar);
   await db.prepare('DELETE FROM users WHERE id = ?').run(req.user.id);
   res.status(204).end();
 });

@@ -13,6 +13,7 @@ import { registerPWA } from '../core/pwa.js';
 import { xpMeter, levelTitle, ringPercent } from '../core/gamification.js';
 import { $, el, svg, loader, toast, modal, confirmDialog, fmtDistance, fmtDuration, fmtNum, qs } from '../core/ui.js';
 import { VEHICLE_TYPES, vehIcon, badgeIcon } from '../core/constants.js';
+import { cropAvatar } from '../core/avatar-crop.js';
 import api from '../core/api.js';
 
 const DEFAULT_AVATAR = '/images/avatars/default.svg';
@@ -165,11 +166,20 @@ async function friendActionCard(targetId) {
 function headerCard(user, isOwn) {
   const level = user.level ?? user.progress?.level ?? 1;
   const percent = user.progress ? user.progress.percent : ringPercent(user.xp || 0);
+  const ring = el('div', { class: 'avatar-ring', style: `--ring:${percent}%;width:104px;height:104px;padding:3px`, title: `Livello ${level}` }, [
+    el('img', { class: 'avatar lg', src: user.avatar || DEFAULT_AVATAR, alt: user.nickname || '', style: 'width:100%;height:100%' }),
+  ]);
+  // Sul proprio profilo la foto è il pulsante per cambiarla: è il punto dove si
+  // prova a toccare, e prima non rispondeva (si passava da "Modifica profilo").
+  if (isOwn) {
+    ring.classList.add('editable');
+    ring.title = 'Cambia foto profilo';
+    ring.append(el('span', { class: 'avatar-cam', html: svg('camera', 16) }));
+    ring.addEventListener('click', pickAvatar);
+  }
   return el('div', { class: 'card' }, [
     el('div', { class: 'flex gap-3 items-center', style: 'margin-bottom:var(--sp-3)' }, [
-      el('div', { class: 'avatar-ring', style: `--ring:${percent}%;width:104px;height:104px;padding:3px`, title: `Livello ${level}` }, [
-        el('img', { class: 'avatar lg', src: user.avatar || DEFAULT_AVATAR, alt: user.nickname || '', style: 'width:100%;height:100%' }),
-      ]),
+      ring,
       el('div', { style: 'min-width:0;flex:1' }, [
         el('h1', { text: user.nickname || '—', style: 'font-size:1.6rem' }),
         el('div', { class: 'text-accent', style: 'font-weight:600', text: user.title || levelTitle(level) }),
@@ -217,35 +227,76 @@ function actionsCard() {
   ]);
 }
 
+/* -------------------- Foto profilo --------------------
+ * Il giro completo: scegli il file → lo inquadri nel tondo (zoom + trascina) →
+ * parte un JPEG 512×512 di un centinaio di KB. Il ritaglio nel browser non è
+ * un vezzo: una foto da telefono pesa più del limite di richiesta della
+ * funzione serverless, e caricata intera verrebbe respinta.
+ */
+const MAX_PICK_BYTES = 25 * 1024 * 1024;
+
+/** Apre il selettore file e porta a termine il cambio foto. Ritorna l'URL. */
+function pickAvatar() {
+  const input = el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
+  document.body.append(input);
+  return new Promise((resolve) => {
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (!file) { resolve(null); return; }
+      resolve(await uploadAvatar(file));
+    });
+    // Selettore chiuso senza scegliere: nessun evento 'change' arriva, quindi
+    // l'input resterebbe attaccato al DOM per sempre.
+    input.addEventListener('cancel', () => { input.remove(); resolve(null); });
+    input.click();
+  });
+}
+
+/** Ritaglia e carica la foto scelta. Ritorna l'URL nuovo, o null. */
+async function uploadAvatar(file) {
+  if (!file.type.startsWith('image/')) { toast.error('Serve un\'immagine (JPG, PNG o WEBP).'); return null; }
+  if (file.size > MAX_PICK_BYTES) { toast.error('Immagine troppo grande: scegline una sotto i 25 MB.'); return null; }
+
+  let blob;
+  try { blob = await cropAvatar(file); }
+  catch { toast.error('Immagine non leggibile: prova con un\'altra.'); return null; }
+  if (!blob) return null; // annullato dall'editor
+
+  const fd = new FormData();
+  fd.append('image', blob, 'avatar.jpg');
+  try {
+    const { avatar } = await api.upload('/users/me/avatar', fd);
+    auth.user = { ...(auth.user || {}), avatar };
+    // Tutte le copie della foto già a schermo (intestazione, modale, liste).
+    document.querySelectorAll('.avatar-ring img').forEach((i) => { i.src = avatar; });
+    toast.success('Foto profilo aggiornata!');
+    return avatar;
+  } catch (err) {
+    toast.error(err.message || 'Caricamento non riuscito.');
+    return null;
+  }
+}
+
 function openEditModal() {
   const user = auth.user || {};
   const img = el('img', { class: 'avatar lg', src: user.avatar || DEFAULT_AVATAR, alt: '' });
-  const fileInput = el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
-  const pickBtn = el('button', { type: 'button', class: 'btn btn-outline btn-sm', html: `${svg('camera', 18)} Cambia foto`, onClick: () => fileInput.click() });
+  const pickBtn = el('button', { type: 'button', class: 'btn btn-outline btn-sm', html: `${svg('camera', 18)} Cambia foto` });
   const nickInput = el('input', { class: 'input', value: user.nickname || '', maxlength: '24', placeholder: 'Nickname' });
   const bioInput = el('textarea', { class: 'textarea', maxlength: '300', placeholder: 'Racconta chi sei…' });
   bioInput.value = user.bio || '';
 
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files && fileInput.files[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append('image', file);
-    try {
-      const { avatar } = await api.upload('/users/me/avatar', fd);
-      img.src = avatar;
-      auth.user = { ...(auth.user || {}), avatar };
-      document.querySelectorAll('.avatar-ring img').forEach((i) => { i.src = avatar; });
-      toast.success('Foto aggiornata!');
-    } catch (err) {
-      toast.error(err.message || 'Caricamento non riuscito.');
-    }
+  pickBtn.addEventListener('click', async () => {
+    pickBtn.disabled = true;
+    const url = await pickAvatar();
+    if (url) img.src = url;
+    pickBtn.disabled = false;
   });
 
   const body = el('div', {}, [
     el('div', { class: 'field' }, [
       el('label', { text: 'Foto profilo' }),
-      el('div', { class: 'flex gap-3 items-center' }, [img, pickBtn, fileInput]),
+      el('div', { class: 'flex gap-3 items-center' }, [img, pickBtn]),
     ]),
     el('div', { class: 'field' }, [el('label', { text: 'Nickname' }), nickInput]),
     el('div', { class: 'field' }, [el('label', { text: 'Bio' }), bioInput]),

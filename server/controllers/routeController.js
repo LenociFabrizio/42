@@ -12,6 +12,7 @@ import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, ROUTE_VEHICLE_TYPES, ROUTE_PRIVAC
 import { persistUpload } from '../middleware/upload.js';
 import { isInItaly } from '../utils/geo.js';
 import { createRoute, submitCompletion } from '../services/routeService.js';
+import { areaGate } from '../services/areaAccess.js';
 import { recomputeUserStats } from '../services/stats.js';
 import { isClubAdmin, isClubMember } from '../services/clubAccess.js';
 
@@ -33,6 +34,13 @@ export const list = asyncHandler(async (req, res) => {
       "(privacy = 'public' OR creator_id = ? OR (privacy = 'club' AND club_id IN (SELECT club_id FROM club_members WHERE user_id = ?)))"
     );
     args.push(req.user.id, req.user.id);
+    // Aree: un percorso in una regione non ancora conquistata non si vede. Lo
+    // decide il server (vedi areaAccess.js) — è la regola del gioco, non un
+    // filtro estetico. Senza account non c'è nessuna mappa delle scoperte a cui
+    // riferirsi, quindi il gate non si applica.
+    const gate = areaGate(req.user.id);
+    where.push(gate.sql);
+    args.push(...gate.args);
   } else {
     where.push("privacy = 'public'");
   }

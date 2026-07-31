@@ -10,7 +10,7 @@ import { asyncHandler, HttpError, sanitizeUser, publicUser } from '../utils/help
 import * as v from '../utils/validate.js';
 import { VEHICLE_TYPES } from '../utils/constants.js';
 import { progress, levelTitle } from '../utils/levels.js';
-import { persistUpload } from '../middleware/upload.js';
+import { persistUpload, deleteUpload } from '../middleware/upload.js';
 import { checkBadges } from '../services/gamification.js';
 
 /** Verifica se `viewerId` può vedere il profilo di `owner` secondo la privacy. */
@@ -114,11 +114,20 @@ export const updateProfile = asyncHandler(async (req, res) => {
   res.json({ user: sanitizeUser(fresh) });
 });
 
-/** POST /api/users/me/avatar — upload immagine profilo. */
+/**
+ * POST /api/users/me/avatar — upload immagine profilo.
+ * Il client manda un JPEG già ritagliato quadrato (vedi avatar-crop.js): qui si
+ * salva e si sostituisce, cancellando la foto precedente per non lasciare file
+ * orfani sullo storage.
+ */
 export const uploadAvatar = asyncHandler(async (req, res) => {
   if (!req.file) throw new HttpError(400, 'Nessun file ricevuto.');
+  const before = await db.prepare('SELECT avatar FROM users WHERE id = ?').get(req.user.id);
   const url = await persistUpload(req.file, 'avatars');
   await db.prepare("UPDATE users SET avatar = ?, updated_at = datetime('now') WHERE id = ?").run(url, req.user.id);
+  // Solo DOPO che la nuova foto è salva: se l'upload fallisse, la vecchia deve
+  // restare al suo posto invece di lasciare il profilo senza immagine.
+  if (before?.avatar && before.avatar !== url) await deleteUpload(before.avatar);
   res.json({ avatar: url });
 });
 

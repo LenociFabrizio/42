@@ -17,7 +17,7 @@ Piattaforma (PWA mobile-first) per **motociclisti, automobilisti e viaggiatori**
 - **PWA**: `manifest.webmanifest` + service worker (`sw.js`) con app shell offline.
 - **Upload**: `multer` in memoria → Vercel Blob in produzione, `public/uploads/` in locale.
 
-> Il **deployment** (Vercel / dominio / CI-CD / hosting) è **volutamente rimandato**: qui ci si concentra su progettazione e sviluppo della WebApp. Lo scaffold serverless (`api/index.js`, `vercel.json`) è predisposto ma non attivato.
+> In produzione l'app gira su **Vercel** (`api/index.js` + `vercel.json`) con database **Turso** e immagini su **Vercel Blob**. Vedi [Deploy e configurazione](#deploy-e-configurazione).
 
 ---
 
@@ -37,6 +37,39 @@ Script:
 - `npm start` — server in produzione.
 - `npm run seed` — popolamento idempotente.
 - `npm run db:reset` — azzera i dati e ripopola.
+- `npm run build:regions` — rigenera la geometria delle Aree per il server.
+- `npm run version:bump` — alza la versione mostrata nell'app.
+
+---
+
+## Deploy e configurazione
+
+Variabili d'ambiente (in locale nel `.env`, in produzione su **Vercel →
+Settings → Environment Variables**):
+
+| Variabile | A cosa serve | Se manca |
+| --- | --- | --- |
+| `JWT_SECRET` | firma delle sessioni | in produzione va impostata lunga e casuale |
+| `DATABASE_URL` / `DATABASE_AUTH_TOKEN` | Turso (`libsql://…`) | in locale si usa il file SQLite embedded |
+| `BLOB_READ_WRITE_TOKEN` | upload immagini (foto profilo, foto percorsi/eventi) | in locale si scrive in `public/uploads/`; su Vercel l'upload risponde **503** con un messaggio esplicito, perché il filesystem è in sola lettura |
+| `RESEND_API_KEY`, `MAIL_FROM`, `BUG_REPORT_TO` | invio email delle segnalazioni | la segnalazione resta solo a database |
+| `GOOGLE_CLIENT_ID` | accesso con Google | il pulsante Google non compare |
+
+### Foto profilo (Vercel Blob)
+
+1. Nel progetto Vercel: **Storage → Blob → Create** (il piano gratuito basta).
+2. Collegando lo store al progetto, Vercel aggiunge da sé `BLOB_READ_WRITE_TOKEN`
+   agli ambienti; in alternativa `vercel env add BLOB_READ_WRITE_TOKEN`.
+3. **Ridistribuire**: le variabili d'ambiente vengono lette all'avvio della
+   funzione, quindi un deploy già in corsa non le vede.
+4. Verifica: `vercel env ls production` deve elencare `BLOB_READ_WRITE_TOKEN`.
+
+Il ritaglio della foto avviene **nel browser** (`public/js/core/avatar-crop.js`):
+parte un JPEG 512×512 di circa 100 KB. Non è solo estetica — una foto da
+telefono pesa più del limite di richiesta di una funzione serverless (~4,5 MB) e
+verrebbe respinta. Sostituendo la foto, la precedente viene **cancellata** dallo
+storage (come alla cancellazione dell'account): il piano gratuito non va sprecato
+in file che nessuno vede più.
 
 ---
 
@@ -80,7 +113,7 @@ public/
 - **Evento**: data/ora, durata, max partecipanti, percorso associato, **area + raggio**; la presenza si conferma con **check-in GPS** verificato lato server.
 - **Club**: nome univoco, privacy, membri/ruoli (creatore/moderatore/membro), livello/XP, classifiche.
 - **Amicizie**: richiesta / accetta / rifiuta, presenza (online adesso oppure "offline da…", da `users.last_active` aggiornato a ogni richiesta autenticata) e avviso con suono quando un amico entra nell'app.
-- **Aree**: le 20 regioni italiane. Alla registrazione si scegli l'**area di partenza** (già scoperta, non più modificabile); le altre restano **zone interdette** sulla mappa (velo scuro, strisce diagonali disegnate in codice, bordo tratteggiato e cartello col lucchetto al centro della regione) e si sbloccano **solo entrandoci davvero** — la corrispondenza punto → regione è calcolata **lato server** su `server/utils/regionsGeo.js` (generato da `public/data/italy-regions.geojson` con `npm run build:regions`). Ogni sblocco dà XP, avanza la missione "Cacciatore di Aree" e i distintivi da *Oltre il Confine* a *Stivale Completo*.
+- **Aree**: le 20 regioni italiane. Alla registrazione si scegli l'**area di partenza** (già scoperta, non più modificabile); le altre restano **zone interdette** sulla mappa (velo scuro, strisce diagonali disegnate in codice, bordo tratteggiato e cartello col lucchetto al centro della regione) e si sbloccano **solo entrandoci davvero**. L'area non è solo grafica: **percorsi ed eventi di una regione non conquistata non vengono nemmeno inviati al client** (`routes.region` / `events.region` + filtro in `services/areaAccess.js`). Restano visibili i propri contenuti, gli eventi a cui sei iscritto e quelli riservati al tuo club — sono inviti, non scoperte — la corrispondenza punto → regione è calcolata **lato server** su `server/utils/regionsGeo.js` (generato da `public/data/italy-regions.geojson` con `npm run build:regions`). Ogni sblocco dà XP, avanza la missione "Cacciatore di Aree" e i distintivi da *Oltre il Confine* a *Stivale Completo*.
 - **Gamification**: XP da attività reale, curva livelli, badge, missioni (giornaliere/settimanali/obiettivi), streak. **Mai pay-to-win.**
 - **Live Map** multiplayer: opt-in con un tocco sul tasto della mappa (`live_enabled`); gli **amici** si vedono sempre, anche lontani, mentre agli **sconosciuti** si appare solo con visibilità `public` e dal **livello 5**. È uno **scambio alla pari**: chi spegne sparisce dalla mappa degli altri e loro dalla sua (resta solo il numero di amici in strada, come invito a riaccendere).
 

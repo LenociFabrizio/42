@@ -127,6 +127,10 @@ CREATE TABLE IF NOT EXISTS routes (
   bbox_max_lng        REAL,
   privacy             TEXT    NOT NULL DEFAULT 'public', -- 'public' | 'private' | 'club'
   club_id             INTEGER,                            -- se privacy='club', club a cui è riservato
+  -- Area (regione italiana) in cui cade la PARTENZA: calcolata dal server alla
+  -- creazione. Serve a mostrare il percorso solo a chi ha scoperto l'area.
+  -- '' = fuori dall'Italia o non determinabile → sempre visibile.
+  region              TEXT,
   -- Record UFFICIALE: appartiene SEMPRE al creatore del percorso.
   -- Punta alla completion del creatore scelta come record principale.
   record_completion_id INTEGER,
@@ -141,6 +145,9 @@ CREATE INDEX IF NOT EXISTS idx_routes_creator ON routes(creator_id);
 CREATE INDEX IF NOT EXISTS idx_routes_privacy ON routes(privacy);
 CREATE INDEX IF NOT EXISTS idx_routes_bbox ON routes(bbox_min_lat, bbox_min_lng, bbox_max_lat, bbox_max_lng);
 CREATE INDEX IF NOT EXISTS idx_routes_category ON routes(category);
+-- L'indice su `region` lo crea runMigrations() in db.js: su un database già
+-- esistente la colonna arriva con un ALTER TABLE, che gira DOPO questo file
+-- (qui il CREATE TABLE è un no-op e l'indice non troverebbe la colonna).
 
 CREATE TABLE IF NOT EXISTS route_tags (
   route_id            INTEGER NOT NULL,
@@ -209,6 +216,9 @@ CREATE TABLE IF NOT EXISTS events (
   status              TEXT    NOT NULL DEFAULT 'scheduled', -- 'scheduled'|'live'|'ended'|'cancelled'
   privacy             TEXT    NOT NULL DEFAULT 'public',    -- 'public' | 'club'
   club_id             INTEGER,                              -- se privacy='club', club a cui è riservato
+  -- Area (regione italiana) del ritrovo: come per i percorsi, decide a chi
+  -- l'evento è visibile. '' = fuori dall'Italia → sempre visibile.
+  region              TEXT,
   created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (creator_id) REFERENCES users(id)  ON DELETE CASCADE,
   FOREIGN KEY (route_id)   REFERENCES routes(id) ON DELETE SET NULL
@@ -216,6 +226,7 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_creator ON events(creator_id);
 CREATE INDEX IF NOT EXISTS idx_events_starts ON events(starts_at);
 CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
+-- Indice su `region`: vedi la nota sui percorsi, lo crea runMigrations().
 
 CREATE TABLE IF NOT EXISTS event_participants (
   event_id            INTEGER NOT NULL,

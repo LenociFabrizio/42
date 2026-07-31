@@ -16,6 +16,7 @@ import { haversine } from '../utils/geo.js';
 import { awardXp, bumpMissions, checkBadges } from './gamification.js';
 import { recomputeUserStats } from './stats.js';
 import { notify } from './notifications.js';
+import { regionCodeAt } from './areaAccess.js';
 
 /**
  * Stato DERIVATO di un evento a partire dall'orario corrente.
@@ -56,8 +57,8 @@ export async function createEvent(userId, input) {
     .prepare(
       `INSERT INTO events
          (creator_id, name, description, photo, starts_at, duration_min, max_participants,
-          route_id, area_lat, area_lng, area_name, radius_m, status, privacy, club_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?)`
+          route_id, area_lat, area_lng, area_name, radius_m, status, privacy, club_id, region)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?)`
     )
     .run(
       userId,
@@ -73,7 +74,10 @@ export async function createEvent(userId, input) {
       input.area_name || '',
       input.radius_m,
       input.privacy || 'public',
-      input.club_id || null
+      input.club_id || null,
+      // Area del ritrovo: chi non l'ha ancora conquistata non vedrà l'evento
+      // nell'elenco (restano visibili gli eventi a cui è iscritto o del suo club).
+      regionCodeAt(input.area_lat, input.area_lng)
     );
   const eventId = info.lastInsertRowid;
 

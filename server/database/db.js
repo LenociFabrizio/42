@@ -122,6 +122,21 @@ async function runMigrations() {
     await db.run('ALTER TABLE events ADD COLUMN club_id INTEGER');
   }
 
+  // Area (regione) di percorsi ed eventi: decide a chi sono visibili. I
+  // contenuti già a database non ce l'hanno, quindi la si ricava dalle loro
+  // coordinate una volta sola (vedi backfillRegions).
+  if (routeCols.length && !routeCols.some((c) => c.name === 'region')) {
+    await db.run('ALTER TABLE routes ADD COLUMN region TEXT');
+  }
+  if (eventCols.length && !eventCols.some((c) => c.name === 'region')) {
+    await db.run('ALTER TABLE events ADD COLUMN region TEXT');
+  }
+  // Gli indici stanno qui e non in schema.sql: su un database già esistente la
+  // colonna nasce dall'ALTER TABLE appena eseguito, mentre schema.sql gira prima.
+  await db.run('CREATE INDEX IF NOT EXISTS idx_routes_region ON routes(region)');
+  await db.run('CREATE INDEX IF NOT EXISTS idx_events_region ON events(region)');
+  await backfillRegions();
+
   // Accesso con Google + stato della sessione live (da quando è online e con
   // quale veicolo sta guidando: mostrati nel popup della live map).
   const userCols = await db.all('PRAGMA table_info(users)');
@@ -165,6 +180,35 @@ async function runMigrations() {
         await db.run(`ALTER TABLE user_settings ADD COLUMN ${name} ${decl}`);
       }
     }
+  }
+}
+
+/**
+ * Assegna l'area a percorsi ed eventi che non l'hanno ancora (contenuti creati
+ * prima delle Aree). Gira a ogni avvio ma tocca solo le righe con `region` NULL:
+ * dopo il primo giro non ce ne sono più, perché anche "fuori dall'Italia" viene
+ * scritto — come stringa vuota — invece di restare NULL. Senza quella
+ * distinzione i punti fuori confine verrebbero ricalcolati per sempre.
+ */
+async function backfillRegions() {
+  // Import dinamico: la geometria delle regioni è un modulo grosso e la
+  // migrazione è l'unico punto del boot che ne ha bisogno.
+  const { regionCodeAt } = await import('../services/areaAccess.js');
+  const jobs = [
+    { table: 'routes', lat: 'start_lat', lng: 'start_lng' },
+    { table: 'events', lat: 'area_lat', lng: 'area_lng' },
+  ];
+  for (const j of jobs) {
+    let rows = [];
+    try {
+      rows = await db.all(`SELECT id, ${j.lat} AS lat, ${j.lng} AS lng FROM ${j.table} WHERE region IS NULL`);
+    } catch { continue; } // tabella o colonna non ancora presenti
+    for (const r of rows) {
+      await db
+        .prepare(`UPDATE ${j.table} SET region = ? WHERE id = ?`)
+        .run(regionCodeAt(r.lat, r.lng), r.id);
+    }
+    if (rows.length) console.log(`[db] area assegnata a ${rows.length} ${j.table}`);
   }
 }
 

@@ -12,6 +12,7 @@ import * as v from '../utils/validate.js';
 import { EVENT_PRIVACY } from '../utils/constants.js';
 import { isInItaly } from '../utils/geo.js';
 import { isClubAdmin, isClubMember } from '../services/clubAccess.js';
+import { areaGate } from '../services/areaAccess.js';
 import {
   deriveStatus,
   createEvent,
@@ -60,6 +61,21 @@ export const list = asyncHandler(async (req, res) => {
       "(e.privacy = 'public' OR e.creator_id = ? OR (e.privacy = 'club' AND e.club_id IN (SELECT club_id FROM club_members WHERE user_id = ?)))"
     );
     args.push(req.user.id, req.user.id);
+    // Aree: un evento in una regione non ancora conquistata non compare
+    // nell'elenco. Restano visibili quelli a cui sei ISCRITTO e quelli riservati
+    // al tuo CLUB: sono inviti rivolti a te, non contenuti da scoprire, e
+    // nasconderli spezzerebbe il raduno invece di alimentare l'esplorazione.
+    const gate = areaGate(req.user.id, {
+      alias: 'e',
+      extra: {
+        sql: `(EXISTS (SELECT 1 FROM event_participants epa
+                        WHERE epa.event_id = e.id AND epa.user_id = ? AND epa.status != 'left')
+               OR (e.privacy = 'club' AND e.club_id IN (SELECT club_id FROM club_members WHERE user_id = ?)))`,
+        args: [req.user.id, req.user.id],
+      },
+    });
+    where.push(gate.sql);
+    args.push(...gate.args);
   } else {
     where.push("e.privacy = 'public'");
   }

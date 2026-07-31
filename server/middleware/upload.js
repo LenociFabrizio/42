@@ -17,11 +17,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config } from '../config/config.js';
 
-const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+// Niente SVG in ingresso: è un documento che può contenere script, e come foto
+// profilo o copertina non serve a nessuno (il client carica sempre un JPEG
+// ritagliato). L'avatar predefinito è un SVG, ma è servito dai file statici.
+const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 function fileFilter(_req, file, cb) {
   if (ALLOWED.includes(file.mimetype)) return cb(null, true);
-  cb(new Error('Formato immagine non supportato (usa JPG, PNG, WEBP o GIF).'));
+  // Senza `status` l'errore risalirebbe come 500: chi sceglie il file sbagliato
+  // leggerebbe "errore interno del server" al posto del motivo vero.
+  const err = new Error('Formato immagine non supportato (usa JPG, PNG, WEBP o GIF).');
+  err.status = 400;
+  cb(err);
 }
 
 export const upload = multer({
@@ -78,4 +85,34 @@ export async function persistUpload(file, subdir = 'misc') {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, name), file.buffer);
   return `/uploads/${subdir}/${name}`;
+}
+
+/**
+ * Cancella un file caricato in precedenza (l'avatar sostituito, per esempio).
+ * Senza questo passo ogni cambio di foto lascerebbe la vecchia su Vercel Blob:
+ * roba che nessuno vede più ma che consuma lo spazio del piano gratuito.
+ *
+ * Non solleva mai: il file può essere già stato rimosso, o essere l'avatar
+ * predefinito, e in nessuno dei due casi è un problema di chi sta caricando.
+ * @param {string} url URL restituito a suo tempo da persistUpload
+ */
+export async function deleteUpload(url) {
+  if (!url || typeof url !== 'string') return;
+  try {
+    if (url.includes('.public.blob.vercel-storage.com')) {
+      if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+      const { del } = await import('@vercel/blob');
+      await del(url, { token: process.env.BLOB_READ_WRITE_TOKEN });
+      return;
+    }
+    if (url.startsWith('/uploads/')) {
+      const rel = url.slice('/uploads/'.length);
+      // L'URL arriva dal database, non dalla richiesta: un controllo sui ".."
+      // costa comunque meno di una cancellazione fuori dalla cartella.
+      if (!rel || rel.includes('..')) return;
+      const full = path.join(config.paths.uploads, rel);
+      if (!full.startsWith(config.paths.uploads)) return;
+      fs.unlinkSync(full);
+    }
+  } catch { /* niente da cancellare: non è un errore */ }
 }

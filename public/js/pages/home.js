@@ -105,7 +105,10 @@ async function main() {
 
   // Aree di gioco: senza area di partenza la chiediamo subito (vale per gli
   // account creati prima di questa funzione e per chi entra con Google).
-  onAreasChange(() => { paintFog(); });
+  // Sbloccando un'area cade il velo E arrivano i suoi contenuti: percorsi ed
+  // eventi delle regioni non conquistate il server non li manda affatto, quindi
+  // vanno richiesti di nuovo (`reload`), non solo ridisegnati.
+  onAreasChange(() => { paintFog(); reload(); });
   await ensureHomeArea();
 
   // Tutorial di benvenuto alla prima apertura dopo la registrazione.

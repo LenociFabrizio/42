@@ -61,11 +61,15 @@ export function nameByGeoName(geoName) {
 
 function apply(data) {
   if (!data) return state;
+  const before = `${state.home}|${state.discovered.join(',')}`;
   if (Array.isArray(data.regions) && data.regions.length) state.regions = data.regions;
   if (Array.isArray(data.discovered)) state.discovered = data.discovered;
   if (data.home !== undefined) state.home = data.home;
   if (data.total) state.total = data.total;
-  onChange?.(state);
+  // Avvisa solo se le aree sono davvero cambiate: `checkArea` ripassa ogni due
+  // minuti e chi ascolta ridisegna la mappa e ricarica i contenuti, lavoro
+  // inutile (e traffico) quando la risposta è identica alla precedente.
+  if (`${state.home}|${state.discovered.join(',')}` !== before) onChange?.(state);
   return state;
 }
 

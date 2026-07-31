@@ -17,6 +17,10 @@ Sintesi delle misure implementate. Principio guida: **mai fidarsi del client**.
 - **CSRF**: l'auth è **Bearer token** in header (non cookie di sessione ambientale), quindi non soggetta a CSRF classico; CORS riflette l'origine con credenziali limitate.
 - Header di sicurezza (HSTS, noSniff, frameguard, referrer-policy, ecc.) via Helmet.
 
+## Upload immagini
+- Solo tipi raster in whitelist (`image/jpeg|png|webp|gif`), limite di dimensione lato multer, nomi di file rigenerati (mai quello scelto dall'utente). **SVG rifiutato**: è un documento che può contenere script, e come immagine di profilo non serve.
+- In produzione i file vanno su **Vercel Blob** (dominio separato dall'app): nessuna scrittura sul filesystem della funzione. La foto sostituita e quella di un account eliminato vengono **cancellate** dallo storage.
+
 ## Rate limiting
 - Globale morbido su `/api`. Stringente su login/registrazione (anti brute-force). Limitatori dedicati su scritture e aggiornamenti di posizione live.
 
@@ -27,6 +31,7 @@ Sintesi delle misure implementate. Principio guida: **mai fidarsi del client**.
 - Le posizioni live mostrano solo campioni recenti (`LIVE_STALE_SECONDS`, 3 minuti) e solo di utenti con condivisione attiva. Disattivando la condivisione le coordinate vengono **cancellate**, non solo nascoste (unica UPDATE condivisa da `PUT /live/settings` e `POST /live/stop`, così i due percorsi non possono divergere).
 - Il check-in agli eventi verifica la distanza dal raggio **lato server** (haversine): il client non può auto-dichiararsi presente.
 - Lo sblocco delle **Aree** (regioni) è deciso dal server: il client invia solo `{lat,lng}` a `POST /regions/visit` e il punto viene confrontato coi confini reali. L'**area di partenza** si imposta una volta sola (cambiarla equivarrebbe a regalarsi aree senza viaggiare) e il catalogo pubblico (`/regions/catalog`) espone soltanto nomi di regioni italiane.
+- I contenuti delle aree **non ancora scoperte non lasciano il server**: `GET /routes` e `GET /events` filtrano in SQL sulle aree dell'utente (`services/areaAccess.js`), non si limitano a nasconderli lato client. Eccezioni volute: i propri contenuti, gli eventi a cui si è iscritti e quelli riservati al proprio club. Il dettaglio per id resta raggiungibile, così inviti e notifiche continuano a funzionare.
 - **Eliminazione account** con conferma password → cancellazione a cascata di tutti i dati collegati.
 
 ## Note per la produzione (deploy futuro)

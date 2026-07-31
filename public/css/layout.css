@@ -83,6 +83,18 @@
   flex-shrink: 0;
 }
 .avatar-ring img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 2px solid var(--bg-000); background: var(--bg-150); }
+/* La propria foto è toccabile: pastiglia con la macchina fotografica in basso a
+   destra, come su qualsiasi app dove l'avatar si cambia dall'avatar. */
+.avatar-ring.editable { position: relative; cursor: pointer; }
+.avatar-ring.editable:active { transform: scale(0.97); }
+.avatar-ring .avatar-cam {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent); color: #120a00;
+  border: 2px solid var(--bg-100);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--sh-sm); pointer-events: none;
+}
 
 /* ---------------- Mappa a tutto schermo ---------------- */
 .map-root {
