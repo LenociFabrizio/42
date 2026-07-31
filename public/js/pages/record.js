@@ -8,7 +8,7 @@
 import '../core/theme.js';
 import { guard } from '../core/auth.js';
 import { registerPWA } from '../core/pwa.js';
-import { createMap, setRouteLine, addMarker } from '../core/map.js';
+import { createMap, setRouteLine, addMarker, onMapReady } from '../core/map.js';
 import { GpsTracker, getCurrentPosition } from '../core/geo.js';
 import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, ROUTE_VEHICLE_TYPES } from '../core/constants.js';
 import { $, svg, el, loader, toast, modal, confirmDialog, fmtDistance, fmtDuration, fmtChrono, qs } from '../core/ui.js';
@@ -44,7 +44,7 @@ async function main() {
 
   map = await createMap('map', { zoom: 14 });
   loader.hide();
-  map.on('load', async () => {
+  onMapReady(map, async () => {
     try { const p = await getCurrentPosition(); map.jumpTo({ center: [p.lng, p.lat], zoom: 15 }); } catch {}
   });
 

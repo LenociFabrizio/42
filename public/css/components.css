@@ -316,26 +316,52 @@
 .maplibregl-popup-content {
   background: var(--bg-100); color: var(--text-hi);
   border: 1px solid var(--border-strong); border-radius: var(--r-lg);
-  padding: 10px 12px; box-shadow: var(--sh-lg); font-size: 0.86rem;
+  padding: 12px 14px; box-shadow: var(--sh-lg); font-size: 0.88rem;
 }
 .maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: var(--border-strong); }
 .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: var(--border-strong); }
 .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--border-strong); }
 .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--border-strong); }
 
-/* Scheda utente live dentro il popup. */
-.live-popup { min-width: 176px; display: flex; flex-direction: column; gap: 6px; }
-.live-popup .lp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+/* Scheda utente live dentro il popup: si legge in un colpo d'occhio, con lo
+   schermo al sole e il mezzo in movimento. Etichetta piccola in alto (ambra,
+   maiuscoletto) e dato grande e pieno sotto, come su un quadrante. */
+.live-popup { min-width: 208px; }
+.live-popup .lp-head {
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 10px; margin-bottom: 10px;
+  border-bottom: 1px solid var(--border-strong);
+}
 .live-popup .lp-avatar {
-  width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+  width: 42px; height: 42px; border-radius: 50%; object-fit: cover;
   border: 2px solid var(--accent); background: var(--bg-150); flex: none;
 }
-.live-popup .lp-id { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
-.live-popup .lp-id strong { font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.live-popup .lp-row { display: flex; align-items: center; gap: 7px; line-height: 1.3; }
-.live-popup .lp-row svg { flex: none; color: var(--accent); }
-.live-popup .lp-muted { color: var(--text-lo); font-size: 0.78rem; }
-.live-popup .lp-row.lp-muted svg { color: var(--text-lo); }
+.live-popup .lp-id { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.live-popup .lp-id strong {
+  font-family: var(--font-display); font-weight: var(--fw-bold);
+  font-size: 1.02rem; line-height: 1.1; color: var(--text-hi);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.live-popup .lp-lvl {
+  font-size: 0.66rem; font-weight: var(--fw-semibold); line-height: 1;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-mid);
+}
+.live-popup .lp-veh { flex: none; color: var(--accent); display: flex; }
+.live-popup .lp-veh svg { display: block; }
+
+.live-popup .lp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.live-popup .lp-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.live-popup .lp-cell.wide { grid-column: 1 / -1; }
+.live-popup .lp-k {
+  font-size: 0.62rem; font-weight: var(--fw-bold); line-height: 1;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent);
+}
+.live-popup .lp-v {
+  font-size: 0.94rem; font-weight: var(--fw-semibold); line-height: 1.25;
+  color: var(--text-hi); font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.live-popup .lp-v-muted { color: var(--text-lo); font-weight: var(--fw-normal); }
 
 /* Griglia scelta (crea percorso/evento) */
 .choice { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }

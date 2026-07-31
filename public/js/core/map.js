@@ -85,6 +85,20 @@ export async function createMap(container, { center = [12.5, 42.5], zoom = 5.2 }
   return map;
 }
 
+/**
+ * Esegue `fn` quando la mappa è pronta a ricevere dati e layer.
+ *
+ * Serve perché l'evento 'load' di MapLibre scatta UNA sola volta: se lo stile ha
+ * già finito di caricare (tile in cache, attese di rete della pagina in mezzo)
+ * chi si iscrive dopo NON viene mai richiamato. Sulla home significava mappa
+ * senza percorsi, senza GPS e senza il polling degli amici live: la posizione
+ * degli altri compariva solo forzando un aggiornamento a mano.
+ */
+export function onMapReady(map, fn) {
+  if (map.isStyleLoaded()) { fn(); return; }
+  map.once('load', fn);
+}
+
 /** Aggiunge il perimetro delle regioni italiane come layer di linee. */
 async function addRegionBorders(map) {
   try {
@@ -138,7 +152,8 @@ export function addMarker(map, { lat, lng, className = 'mk route', html = '', po
   if (onClick) { wrap.style.cursor = 'pointer'; wrap.addEventListener('click', (e) => { e.stopPropagation(); onClick(); }); }
   const marker = new maplibregl.Marker({ element: wrap, anchor: anchorPin ? 'bottom' : 'center' })
     .setLngLat([lng, lat]);
-  if (popupHtml) marker.setPopup(new maplibregl.Popup({ offset: 24, closeButton: false }).setHTML(popupHtml));
+  // maxWidth: il default di MapLibre (240px) taglia le schede a due colonne.
+  if (popupHtml) marker.setPopup(new maplibregl.Popup({ offset: 24, closeButton: false, maxWidth: '300px' }).setHTML(popupHtml));
   marker.addTo(map);
   return marker;
 }

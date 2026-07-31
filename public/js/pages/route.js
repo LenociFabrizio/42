@@ -8,7 +8,7 @@ import '../core/theme.js';
 import { guard, auth } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
-import { createMap, setRouteLine, addMarker, fitPoints } from '../core/map.js';
+import { createMap, setRouteLine, addMarker, fitPoints, onMapReady } from '../core/map.js';
 import { decodePolyline } from '../core/geo.js';
 import { ROUTE_CATEGORIES, ROUTE_DIFFICULTIES, DIFF_LEVEL, catLabel, catIcon } from '../core/constants.js';
 import {
@@ -164,7 +164,9 @@ async function initMap() {
     return;
   }
   const points = decodePolyline(route.track_polyline || ''); // [[lat,lng], ...]
-  map.on('load', () => {
+  // onMapReady e non map.on('load'): se lo stile è già pronto quell'evento non
+  // scatta più e il tracciato non verrebbe mai disegnato.
+  onMapReady(map, () => {
     if (points.length >= 2) {
       setRouteLine(map, 'r', points);
       const start = points[0];

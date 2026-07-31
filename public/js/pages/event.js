@@ -7,7 +7,7 @@ import '../core/theme.js';
 import { guard } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
-import { createMap, addMarker, fitPoints } from '../core/map.js';
+import { createMap, addMarker, fitPoints, onMapReady } from '../core/map.js';
 import { getCurrentPosition } from '../core/geo.js';
 import { $, el, svg, loader, toast, confirmDialog, fmtDate, fmtDistance, esc, qs } from '../core/ui.js';
 import { privacyBadge } from '../core/visibility.js';
@@ -133,7 +133,7 @@ async function render() {
 
   // Crea la mappa e disegna la geofence dopo il montaggio del DOM.
   map = await createMap('map', { center: [ev.area_lng, ev.area_lat], zoom: 13 });
-  map.on('load', () => {
+  onMapReady(map, () => {
     try { drawGeofence(ev.area_lat, ev.area_lng, ev.radius_m); } catch { /* noop */ }
   });
 

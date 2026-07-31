@@ -7,7 +7,7 @@ import '../core/theme.js';
 import { guard } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
-import { createMap } from '../core/map.js';
+import { createMap, onMapReady } from '../core/map.js';
 import { getCurrentPosition } from '../core/geo.js';
 import { $, el, svg, loader, toast, fmtDistance } from '../core/ui.js';
 import { buildPrivacyControl } from '../core/visibility.js';
@@ -110,7 +110,7 @@ function renderStep1() {
   createMap('map', data.area_lat != null ? { center: [data.area_lng, data.area_lat], zoom: 13 } : {}).then((m) => {
     map = m;
     if (data.area_lat == null) {
-      m.on('load', async () => {
+      onMapReady(m, async () => {
         try { const p = await getCurrentPosition(); m.jumpTo({ center: [p.lng, p.lat], zoom: 13 }); } catch { /* noop */ }
       });
     }

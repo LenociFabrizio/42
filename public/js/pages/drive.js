@@ -8,7 +8,7 @@
 import '../core/theme.js';
 import { guard } from '../core/auth.js';
 import { registerPWA } from '../core/pwa.js';
-import { createMap, addMarker, viewportBbox } from '../core/map.js';
+import { createMap, addMarker, viewportBbox, onMapReady } from '../core/map.js';
 import { $, svg, loader, toast, debounce, esc } from '../core/ui.js';
 import { catIcon, DRIVE_MODE_ENABLED } from '../core/constants.js';
 import { TrackingSession, bgEnabled } from '../core/tracking.js';
@@ -62,7 +62,7 @@ async function main() {
   map.on('dragstart', () => { follow = false; });
 
   // Percorsi ed eventi visibili anche qui: si ricaricano quando cambia la vista.
-  map.on('load', loadNearbyContent);
+  onMapReady(map, loadNearbyContent);
   map.on('moveend', debounce(loadNearbyContent, 500));
 
   await session.start();

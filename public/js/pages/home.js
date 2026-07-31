@@ -7,7 +7,7 @@ import '../core/theme.js';
 import { guard, auth } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
-import { createMap, addMarker, viewportBbox, fitRadius, fitPoints } from '../core/map.js';
+import { createMap, addMarker, viewportBbox, fitRadius, fitPoints, onMapReady } from '../core/map.js';
 import { getCurrentPosition, decodePolyline, haversine } from '../core/geo.js';
 import { maybeAutoStart } from '../core/onboarding.js';
 import { $, svg, loader, toast, modal, el, esc, fmtDistance, fmtDuration, fmtSpeed, fmtSince, debounce } from '../core/ui.js';
@@ -23,7 +23,11 @@ let userMarker = null;
 // basso a destra. Lo stato vero sta sul server (users.live_enabled); qui c'è la
 // copia locale, riallineata a ogni cambio e a ogni rifiuto del server.
 const LIVE_HINT_KEY = '4e2_live_hint';
+const LIVE_POLL_MS = 8000; // ogni quanto si aggiornano i puntini degli amici
 let sharing = false;       // sto condividendo la mia posizione?
+let refreshingLive = false; // un giro di /live/nearby è già in corso?
+let lastLiveOkAt = 0;      // ultimo giro andato a buon fine
+let knownLive = null;      // id già visti live (null = primo giro)
 let watchId = null;
 let lastShareAt = 0;       // throttle invio posizione live
 let lastShareOkAt = 0;     // ultimo invio accettato dal server
@@ -81,7 +85,7 @@ async function main() {
   // Avviso di guida responsabile all'ingresso (una volta per sessione).
   showRideDisclaimer();
 
-  map.on('load', () => {
+  onMapReady(map, () => {
     centerOnMe();
     reload();
     startWatch();
@@ -89,17 +93,22 @@ async function main() {
     clearInterval(home._liveTimer);
     // Con la mappa in secondo piano non c'è nulla da ridisegnare: si riprende
     // al ritorno in primo piano (vedi visibilitychange).
-    home._liveTimer = setInterval(() => { if (!document.hidden) refreshLive(); }, 8000);
+    home._liveTimer = setInterval(() => { if (!document.hidden) refreshLive(); }, LIVE_POLL_MS);
     // Battito della posizione: da fermi il GPS può non richiamarci per minuti e
     // agli amici scomparirei dalla mappa (la finestra "live" è di 5 minuti).
     // Se non abbiamo un fix recente, pushPositionNow() lo va a chiedere.
     clearInterval(home._shareTimer);
     home._shareTimer = setInterval(() => {
-      if (document.hidden || !sharing) return;
-      if (Date.now() - lastShareOkAt > 45000) pushPositionNow();
+      if (document.hidden) return;
+      // Rete di sicurezza: se il giro degli amici si è fermato (timer strozzato
+      // dal sistema, richiesta persa) lo si rimette in moto.
+      if (Date.now() - lastLiveOkAt > 3 * LIVE_POLL_MS) refreshLive();
+      if (sharing && Date.now() - lastShareOkAt > 45000) pushPositionNow();
     }, 45000);
   });
-  map.on('moveend', debounce(reload, 400));
+  // Spostando la vista si ricaricano contenuti E chi è live in zona: senza
+  // questo, gli sconosciuti della nuova area comparivano solo al giro dopo.
+  map.on('moveend', debounce(() => { reload(); refreshLive(); }, 400));
 
   // Tornando in primo piano i timer sono stati congelati dal sistema: ci
   // rimettiamo in pari subito, altrimenti per qualche minuto risulteremmo
@@ -575,25 +584,31 @@ function checkHorn(users) {
 }
 
 /**
- * Scheda dell'utente live mostrata nel popup sulla mappa: che veicolo sta
- * guidando e da quanto tempo è online. Resta sulla mappa: nessuna schermata
- * nuova da aprire.
+ * Scheda dell'utente live mostrata nel popup sulla mappa: chi è, che mezzo
+ * guida, a che velocità e da quanto è in strada. Etichetta piccola sopra e dato
+ * grande sotto (come un quadrante): a colpo d'occhio, anche in movimento.
  */
 function livePopupHtml(u) {
-  const veh = [u.vehicle_make, u.vehicle_model].filter(Boolean).join(' ').trim();
-  const vehName = (u.vehicle_name || '').trim();
-  // Etichetta veicolo: "Moto · Ducati Panigale" (nome del mezzo se presente).
   const kind = u.vehicle_type === 'car' ? 'Auto' : u.vehicle_type === 'moto' ? 'Moto' : null;
-  const vehDetail = veh || vehName;
-  const vehLine = kind
-    ? `<div class="lp-row">${svg(vehIcon(u.vehicle_type), 15)}
-         <span><b>${esc(kind)}</b>${vehDetail ? ` · ${esc(vehDetail)}` : ''}</span>
-       </div>`
-    : `<div class="lp-row lp-muted">${svg('bike', 15)}<span>Veicolo non indicato</span></div>`;
+  const model = [u.vehicle_make, u.vehicle_model].filter(Boolean).join(' ').trim() || (u.vehicle_name || '').trim();
+  const speed = Number.isFinite(u.last_speed) && u.last_speed > 1 ? fmtSpeed(u.last_speed) : null;
+  const since = fmtSince(u.live_since || u.last_seen);
 
-  const speed = Number.isFinite(u.last_speed) && u.last_speed > 1
-    ? `<div class="lp-row">${svg('gauge', 15)}<span>${fmtSpeed(u.last_speed)}</span></div>`
-    : '';
+  const cell = (label, value, { wide = false, muted = false } = {}) => `
+    <div class="lp-cell${wide ? ' wide' : ''}">
+      <span class="lp-k">${esc(label)}</span>
+      <span class="lp-v${muted ? ' lp-v-muted' : ''}">${esc(value)}</span>
+    </div>`;
+
+  const cells = [
+    kind
+      ? cell(kind, model || 'Modello non indicato', { wide: true, muted: !model })
+      : cell('Veicolo', 'Non indicato', { wide: true, muted: true }),
+    speed ? cell('Velocità', speed) : '',
+    // Da fermo la velocità non c'è: il tempo si prende tutta la riga invece di
+    // restare spaiato in mezza colonna.
+    cell('In strada da', since, { wide: !speed }),
+  ].join('');
 
   return `
     <div class="live-popup">
@@ -601,32 +616,42 @@ function livePopupHtml(u) {
         <img class="lp-avatar" src="${esc(u.avatar || '/images/avatars/default.svg')}" alt="" />
         <div class="lp-id">
           <strong>${esc(u.nickname)}</strong>
-          <span class="lp-muted">Liv. ${Number(u.level) || 1}</span>
+          <span class="lp-lvl">${u.is_friend ? 'Amico' : 'Pilota'} · Liv. ${Number(u.level) || 1}</span>
         </div>
+        ${kind ? `<span class="lp-veh">${svg(vehIcon(u.vehicle_type), 20)}</span>` : ''}
       </div>
-      ${vehLine}
-      ${speed}
-      <div class="lp-row">${svg('clock', 15)}<span>Online da <b>${esc(fmtSince(u.live_since || u.last_seen))}</b></span></div>
+      <div class="lp-grid">${cells}</div>
     </div>`;
 }
 
+/**
+ * Aggiorna i puntini di chi è live. Girando ogni LIVE_POLL_MS (più: cambio
+ * vista, ritorno in primo piano, attivazione della condivisione) un amico che
+ * accende la posizione compare da solo, senza toccare niente.
+ * Il flag `refreshingLive` evita che una richiesta lenta ne accodi altre.
+ */
 async function refreshLive() {
+  if (refreshingLive) return;
+  refreshingLive = true;
   try {
     // Il bbox filtra solo gli sconosciuti: gli amici che condividono arrivano
     // sempre, anche lontani (li si raggiunge dal foglio "Posizione live").
     const { users } = await api.get('/live/nearby', { bbox: viewportBbox(map) });
-    checkHorn(users || []);
-    liveFriends = (users || []).filter((u) => u.is_friend);
+    const list = users || [];
+    checkHorn(list);
+    liveFriends = list.filter((u) => u.is_friend);
     paintLiveFab();
     liveSheet?.render();
+    announceNewLive();
+
     const seen = new Set();
-    for (const u of users || []) {
+    for (const u of list) {
       seen.add(u.id);
       const html = livePopupHtml(u);
       const existing = markers.live.get(u.id);
       if (existing) {
         existing.setLngLat([u.last_lng, u.last_lat]);
-        // Aggiorna il contenuto (il tempo online scorre) anche a popup aperto.
+        // Aggiorna il contenuto (velocità e tempo scorrono) anche a popup aperto.
         existing.getPopup()?.setHTML(html);
       } else {
         markers.live.set(u.id, addMarker(map, {
@@ -638,7 +663,29 @@ async function refreshLive() {
     }
     // Rimuovi chi non è più live.
     for (const [id, m] of markers.live) if (!seen.has(id)) { m.remove(); markers.live.delete(id); }
-  } catch { /* silenzioso */ }
+    lastLiveOkAt = Date.now();
+  } catch { /* rete assente: si riprova al giro dopo */ }
+  finally { refreshingLive = false; }
+}
+
+/**
+ * Avvisa quando un amico ACCENDE la posizione mentre sei sulla mappa: è il
+ * momento in cui prima non succedeva niente e sembrava che non funzionasse.
+ * Il primo giro registra solo la situazione di partenza.
+ */
+function announceNewLive() {
+  const ids = new Set(liveFriends.map((u) => u.id));
+  if (knownLive === null) { knownLive = ids; return; }
+  const arrivals = liveFriends.filter((u) => !knownLive.has(u.id));
+  knownLive = ids;
+  if (!arrivals.length) return;
+  const b = map.getBounds();
+  const anyInView = arrivals.some((u) => b.contains([u.last_lng, u.last_lat]));
+  const where = anyInView ? '' : ' — è fuori dalla vista, tocca il segnaposto per raggiungerlo';
+  const msg = arrivals.length === 1
+    ? `${arrivals[0].nickname} ha attivato la posizione${where}`
+    : `${arrivals.length} amici hanno attivato la posizione`;
+  toast.info(msg, { duration: 4600 });
 }
 
 /* ============================================================
