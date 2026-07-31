@@ -113,6 +113,7 @@
 
 /* Pulsanti flottanti mappa (posizione, ricerca) */
 .map-fab {
+  position: relative;
   width: 48px; height: 48px; border-radius: 50%;
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur));
@@ -123,6 +124,18 @@
 }
 .map-fab:active { transform: scale(0.94); }
 .map-fab.active { color: var(--accent); border-color: var(--accent); }
+.map-fab:disabled { opacity: 0.6; }
+/* Quante persone stanno condividendo la posizione in questo momento: si vede
+   anche quando i loro puntini sono fuori dalla vista. */
+.map-fab .fab-count {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--accent); color: #120a00;
+  font-size: 0.64rem; font-weight: 700; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--bg-000);
+}
 .map-fab-stack { position: absolute; right: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2);
   bottom: calc(var(--bottomnav-h) + var(--safe-bottom) + var(--sp-3)); z-index: var(--z-hud); }
 

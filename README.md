@@ -81,7 +81,7 @@ public/
 - **Club**: nome univoco, privacy, membri/ruoli (creatore/moderatore/membro), livello/XP, classifiche.
 - **Amicizie**: richiesta / accetta / rifiuta, presenza (online adesso oppure "offline da…", da `users.last_active` aggiornato a ogni richiesta autenticata) e avviso con suono quando un amico entra nell'app.
 - **Gamification**: XP da attività reale, curva livelli, badge, missioni (giornaliere/settimanali/obiettivi), streak. **Mai pay-to-win.**
-- **Live Map** multiplayer: opt-in, visibile secondo privacy, sbloccata dal **livello 5**.
+- **Live Map** multiplayer: opt-in con un tocco sul tasto della mappa (`live_enabled`); gli **amici** si vedono sempre, anche lontani, mentre agli **sconosciuti** si appare solo con visibilità `public` e dal **livello 5**.
 
 Dettagli sicurezza in [`SECURITY.md`](./SECURITY.md).
 

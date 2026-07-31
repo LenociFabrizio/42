@@ -5,7 +5,7 @@ Sintesi delle misure implementate. Principio guida: **mai fidarsi del client**.
 ## Autenticazione & autorizzazione
 - Password con hash **bcrypt** (cost 10). Mai in chiaro, mai restituite (`sanitizeUser` rimuove `password_hash`).
 - Sessioni via **JWT** firmati (`JWT_SECRET`, scadenza configurabile). Middleware `requireAuth` / `optionalAuth` / `requireAdmin` / `requireLevel`.
-- La **Live Map** è gated dal livello 5 (`requireLevel`) e richiede consenso esplicito (`live_enabled`).
+- La **Live Map** richiede sempre consenso esplicito (`live_enabled`, revocabile in un tocco). Il livello 5 non serve a condividere con gli **amici**: gate solo per essere visibili agli **sconosciuti** (visibilità `public`).
 
 ## Validazione input
 - Ogni endpoint valida e normalizza i dati con `server/utils/validate.js` (stringhe con min/max, email, nickname whitelist `[a-zA-Z0-9._-]`, interi/float con range, coordinate lat/lng, enum `oneOf`, date ISO, tracce GPS con limite di punti). Errori → `400` con messaggio chiaro.
@@ -22,7 +22,8 @@ Sintesi delle misure implementate. Principio guida: **mai fidarsi del client**.
 
 ## Privacy & dati GPS
 - Visibilità profilo e posizione configurabili (`public` / `friends` / `private`). La `GET /live/nearby` filtra ogni utente secondo la **sua** `location_visibility` e verifica l'amicizia lato server.
-- Le posizioni live mostrano solo campioni recenti (ultimi 5 minuti) e solo di utenti con condivisione attiva.
+- Il filtro di viewport (`bbox`) della `GET /live/nearby` vale **solo per gli sconosciuti** (che devono anche essere `public` e di livello ≥ 5). Gli **amici** che condividono arrivano sempre: è una scelta di prodotto (due amici lontani devono potersi vedere), non un allentamento del consenso.
+- Le posizioni live mostrano solo campioni recenti (ultimi 5 minuti) e solo di utenti con condivisione attiva. Disattivando la condivisione le coordinate vengono **cancellate**, non solo nascoste.
 - Il check-in agli eventi verifica la distanza dal raggio **lato server** (haversine): il client non può auto-dichiararsi presente.
 - **Eliminazione account** con conferma password → cancellazione a cascata di tutti i dati collegati.
 

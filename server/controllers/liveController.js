@@ -126,29 +126,18 @@ export const stop = asyncHandler(async (req, res) => {
  * "recent" = last_seen negli ultimi 5 minuti. Solo utenti con live_enabled = 1,
  * escluso me stesso. Regole di visibilità (con consenso già garantito da
  * live_enabled):
- *   - AMICO (amicizia accettata): visibile SEMPRE, senza livello minimo,
- *     purché la sua visibilità non sia 'private'.
- *   - SCONOSCIUTO (non amico): visibile SOLO se la sua visibilità è 'public'
- *     E il suo livello è >= LIVE_MAP_MIN_LEVEL.
- * Filtro opzionale bbox = "minLng,minLat,maxLng,maxLat".
+ *   - AMICO (amicizia accettata): visibile SEMPRE, senza livello minimo e
+ *     SENZA filtro di viewport, purché la sua visibilità non sia 'private'.
+ *   - SCONOSCIUTO (non amico): visibile SOLO se la sua visibilità è 'public',
+ *     il suo livello è >= LIVE_MAP_MIN_LEVEL ed è dentro la vista richiesta.
+ *
+ * Il bbox ("minLng,minLat,maxLng,maxLat") serve a non scaricare mezza Italia di
+ * sconosciuti: applicarlo anche agli amici era un errore, perché due amici
+ * lontani non si vedevano mai e dalla mappa non si capiva il perché.
+ * Ogni riga porta `is_friend`, così il client sa chi può inquadrare.
  */
 export const nearby = asyncHandler(async (req, res) => {
-  const where = [
-    'u.live_enabled = 1',
-    "u.last_seen >= datetime('now', '-5 minutes')",
-    'u.id != ?',
-  ];
-  const args = [req.user.id];
-
-  // Filtro viewport opzionale.
-  if (req.query.bbox) {
-    const parts = String(req.query.bbox).split(',').map(Number);
-    if (parts.length === 4 && parts.every(Number.isFinite)) {
-      const [minLng, minLat, maxLng, maxLat] = parts;
-      where.push('u.last_lat >= ? AND u.last_lat <= ? AND u.last_lng >= ? AND u.last_lng <= ?');
-      args.push(minLat, maxLat, minLng, maxLng);
-    }
-  }
+  const me = req.user.id;
 
   // Sottoquery amicizia accettata tra il target (u) e me.
   const FRIEND = `EXISTS (
@@ -158,29 +147,24 @@ export const nearby = asyncHandler(async (req, res) => {
          OR (f.requester_id = ? AND f.addressee_id = u.id))
   )`;
 
-  where.push(
-    `(
-       (
-         COALESCE(us.location_visibility, 'friends') IN ('friends', 'public')
-         AND ${FRIEND}
-       )
-       OR (
-         COALESCE(us.location_visibility, 'friends') = 'public'
-         AND u.level >= ?
-         AND NOT ${FRIEND}
-       )
-     )`
-  );
-  // Ordine dei parametri: friend(amico) x2, poi livello, poi friend(sconosciuto) x2.
-  args.push(req.user.id, req.user.id, LIVE_MAP_MIN_LEVEL, req.user.id, req.user.id);
+  // Filtro viewport opzionale (solo sconosciuti).
+  let bboxSql = '1 = 1';
+  const bboxArgs = [];
+  if (req.query.bbox) {
+    const parts = String(req.query.bbox).split(',').map(Number);
+    if (parts.length === 4 && parts.every(Number.isFinite)) {
+      const [minLng, minLat, maxLng, maxLat] = parts;
+      bboxSql = 'u.last_lat >= ? AND u.last_lat <= ? AND u.last_lng >= ? AND u.last_lng <= ?';
+      bboxArgs.push(minLat, maxLat, minLng, maxLng);
+    }
+  }
 
   // Veicolo mostrato: quello dichiarato in guida (live_vehicle_id) oppure,
   // in mancanza, il veicolo principale del profilo.
-  const rows = await db
-    .prepare(
-      `SELECT u.id, u.nickname, u.avatar, u.level,
+  const sql = `SELECT u.id, u.nickname, u.avatar, u.level,
               u.last_lat, u.last_lng, u.last_speed, u.last_heading, u.last_seen,
               u.live_since,
+              ${FRIEND} AS is_friend,
               COALESCE(dv.type, pv.type)   AS vehicle_type,
               COALESCE(dv.name, pv.name)   AS vehicle_name,
               COALESCE(dv.make, pv.make)   AS vehicle_make,
@@ -192,10 +176,29 @@ export const nearby = asyncHandler(async (req, res) => {
                 SELECT id FROM vehicles WHERE user_id = u.id
                  ORDER BY is_primary DESC, id LIMIT 1
               )
-        WHERE ${where.join(' AND ')}
-        ORDER BY u.last_seen DESC`
-    )
-    .all(...args);
+        WHERE u.live_enabled = 1
+          AND u.last_seen >= datetime('now', '-5 minutes')
+          AND u.last_lat IS NOT NULL AND u.last_lng IS NOT NULL
+          AND u.id != ?
+          AND (
+                (
+                  COALESCE(us.location_visibility, 'friends') IN ('friends', 'public')
+                  AND ${FRIEND}
+                )
+                OR (
+                  COALESCE(us.location_visibility, 'friends') = 'public'
+                  AND u.level >= ?
+                  AND NOT ${FRIEND}
+                  AND (${bboxSql})
+                )
+              )
+        ORDER BY is_friend DESC, u.last_seen DESC`;
+
+  // I segnaposto seguono l'ordine del testo SQL: is_friend (2), u.id != ? (1),
+  // amico (2), livello minimo (1), sconosciuto (2), bbox (0 o 4).
+  const args = [me, me, me, me, me, LIVE_MAP_MIN_LEVEL, me, me, ...bboxArgs];
+
+  const rows = await db.prepare(sql).all(...args);
 
   res.json({ users: rows });
 });

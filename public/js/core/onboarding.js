@@ -41,8 +41,8 @@ const SLIDES = [
   },
   {
     ic: 'pinUser',
-    title: 'Dove sono gli altri',
-    text: 'Il tasto col segnaposto, in basso a destra, mostra chi è in strada in questo momento: è attivo di serie. Tocca un puntino per sapere che auto o moto sta guidando e da quanto è online. Per comparire anche tu serve il tuo consenso: te lo chiediamo al primo tocco, oppure lo attivi da Impostazioni → Live Map.',
+    title: 'Vedersi in tempo reale',
+    text: 'Il tasto col segnaposto, in basso a destra, accende la condivisione: un tocco e gli amici ti vedono muoverti sulla mappa, e tu vedi loro. Il numero sul tasto dice quanti sono in strada adesso; toccandolo di nuovo apri l\'elenco per raggiungerli anche se sono lontani, o per smettere di condividere. Tocca un puntino per sapere che auto o moto sta guidando.',
   },
   {
     ic: 'users',

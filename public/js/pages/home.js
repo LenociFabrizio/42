@@ -7,10 +7,10 @@ import '../core/theme.js';
 import { guard, auth } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
-import { createMap, addMarker, viewportBbox, fitRadius } from '../core/map.js';
+import { createMap, addMarker, viewportBbox, fitRadius, fitPoints } from '../core/map.js';
 import { getCurrentPosition, decodePolyline, haversine } from '../core/geo.js';
 import { maybeAutoStart } from '../core/onboarding.js';
-import { $, svg, loader, toast, modal, confirmDialog, el, esc, fmtDistance, fmtDuration, fmtSpeed, fmtSince, debounce } from '../core/ui.js';
+import { $, svg, loader, toast, modal, el, esc, fmtDistance, fmtDuration, fmtSpeed, fmtSince, debounce } from '../core/ui.js';
 import { catIcon, poiIcon, catLabel, vehIcon, DEFAULT_MAP_RADIUS_KM, DRIVE_MODE_ENABLED } from '../core/constants.js';
 import { initSound, playNotify, playHorn } from '../core/sound.js';
 import { showDirections } from '../core/nav.js';
@@ -19,18 +19,21 @@ import api from '../core/api.js';
 
 let map;
 let userMarker = null;
-// Livello "dove sono gli amici": attivo per impostazione predefinita (è il
-// senso della mappa) e ricordato sul dispositivo.
-const LIVE_LAYER_KEY = '4e2_live_layer';
-const LIVE_ASK_KEY = '4e2_live_ask';
+// Condivisione della posizione con gli amici: è ciò che comanda il tasto in
+// basso a destra. Lo stato vero sta sul server (users.live_enabled); qui c'è la
+// copia locale, riallineata a ogni cambio e a ogni rifiuto del server.
 const LIVE_HINT_KEY = '4e2_live_hint';
-let liveOn = localStorage.getItem(LIVE_LAYER_KEY) !== 'off';
+let sharing = false;       // sto condividendo la mia posizione?
 let watchId = null;
 let lastShareAt = 0;       // throttle invio posizione live
+let lastShareOkAt = 0;     // ultimo invio accettato dal server
+let liveFriends = [];      // amici che stanno condividendo adesso
+let liveSheet = null;      // foglio "Posizione live" aperto (per aggiornarlo)
 
 let mapRadiusKm = DEFAULT_MAP_RADIUS_KM; // raggio di visibilità (Impostazioni)
 let myPos = null;          // ultima posizione nota (per il saluto col clacson)
 let myCoords = null;       // ultime coordinate GPS complete (per il battito live)
+let myCoordsAt = 0;        // quando è arrivato quel fix (ms)
 // Ultima posizione salvata: apre la mappa già dalle tue parti, senza attese.
 const LAST_POS_KEY = '4e2_last_pos';
 let centered = false;      // la mappa è già stata inquadrata su di me?
@@ -55,10 +58,11 @@ async function main() {
   initSound(); // sblocca l'audio al primo tocco (policy autoplay)
 
   $('#fab-locate').innerHTML = svg('crosshair', 22);
-  // Segnaposto con una persona dentro: si capisce a colpo d'occhio che mostra
-  // "dove sono" gli amici, non solo "gli amici".
+  // Segnaposto con una persona dentro: un tocco e sei sulla mappa degli amici.
+  // Acceso = stai condividendo la posizione.
+  sharing = !!user.live_enabled;
   $('#fab-live').innerHTML = svg('pinUser', 22);
-  $('#fab-live').classList.toggle('active', liveOn);
+  paintLiveFab();
   // Solo Mappa: funzionalità sospesa, il tasto resta fuori dal DOM.
   const fabDrive = $('#fab-drive');
   if (DRIVE_MODE_ENABLED) {
@@ -81,20 +85,30 @@ async function main() {
     centerOnMe();
     reload();
     startWatch();
-    // Vicinanze: sempre in ascolto (serve al saluto col clacson), i marker
-    // compaiono solo col livello live attivo.
     refreshLive().then(hintLiveSharing);
     clearInterval(home._liveTimer);
     home._liveTimer = setInterval(refreshLive, 8000);
     // Battito della posizione: da fermi il GPS può non richiamarci per minuti e
     // agli amici scomparirei dalla mappa (la finestra "live" è di 5 minuti).
+    // Se non abbiamo un fix recente, pushPositionNow() lo va a chiedere.
     clearInterval(home._shareTimer);
-    home._shareTimer = setInterval(() => { if (myCoords) shareLive(myCoords); }, 60000);
+    home._shareTimer = setInterval(() => {
+      if (sharing && Date.now() - lastShareOkAt > 45000) pushPositionNow();
+    }, 45000);
   });
   map.on('moveend', debounce(reload, 400));
 
+  // Tornando in primo piano i timer sono stati congelati dal sistema: ci
+  // rimettiamo in pari subito, altrimenti per qualche minuto risulteremmo
+  // spariti dalla mappa degli amici (e loro dalla nostra).
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || !map) return;
+    if (sharing) pushPositionNow();
+    refreshLive();
+  });
+
   $('#fab-locate').addEventListener('click', () => locate(true));
-  $('#fab-live').addEventListener('click', toggleLive);
+  $('#fab-live').addEventListener('click', onLiveFabClick);
 }
 
 /** Segue la posizione (aggiorna il marker "tu") e valuta la prossimità. */
@@ -105,6 +119,7 @@ function startWatch() {
       const lat = pos.coords.latitude, lng = pos.coords.longitude;
       myPos = { lat, lng };
       myCoords = pos.coords;
+      myCoordsAt = Date.now();
       showMe(lat, lng);
       // Se l'inquadratura iniziale non è ancora riuscita (permesso concesso
       // in ritardo, primo fix lento), il primo aggiornamento centra la mappa.
@@ -118,13 +133,14 @@ function startWatch() {
 }
 
 /**
- * Condivide la posizione live (solo se l'utente ha dato il consenso in
- * Impostazioni). Throttle a 15s: basta per la live map e risparmia batteria.
+ * Condivide la posizione live (solo con la condivisione attiva).
+ * Throttle a 15s: basta per la live map e risparmia batteria.
+ * @returns {Promise<boolean>} true se il server ha accettato la posizione.
  */
 async function shareLive(coords) {
-  if (!auth.user?.live_enabled) return;
+  if (!sharing) return false;
   const now = Date.now();
-  if (now - lastShareAt < 15000) return;
+  if (now - lastShareAt < 15000) return false;
   lastShareAt = now;
   try {
     await api.post('/live/position', {
@@ -134,13 +150,45 @@ async function shareLive(coords) {
       speed: Number.isFinite(coords.speed) && coords.speed >= 0 ? coords.speed * 3.6 : null,
       heading: Number.isFinite(coords.heading) ? coords.heading : null,
     });
+    lastShareOkAt = Date.now();
+    return true;
   } catch (err) {
     // Rete assente: riprova al prossimo aggiornamento GPS, senza aspettare il
-    // throttle. Se invece il server dice "consenso spento" (403) allineiamo la
-    // copia locale, altrimenti continueremmo a bussare a vuoto.
+    // throttle. Se invece il server dice "consenso spento" (403) allineiamo
+    // tutto, altrimenti continueremmo a bussare a vuoto mostrando il tasto
+    // acceso: è così che "condivido ma non mi vedono" restava invisibile.
     lastShareAt = 0;
-    if (err?.status === 403) auth.patchUser({ live_enabled: 0 });
+    if (err?.status === 403) {
+      sharing = false;
+      lastShareOkAt = 0;
+      auth.patchUser({ live_enabled: 0 });
+      paintLiveFab();
+    }
+    return false;
   }
+}
+
+/**
+ * Invia SUBITO la posizione, ignorando il throttle. Se non c'è un fix recente
+ * lo va a chiedere: da fermi il GPS può tacere per minuti e senza questo passo
+ * l'attivazione non produrrebbe nessun puntino sulla mappa degli amici.
+ * @returns {Promise<boolean>} true se la posizione è arrivata al server.
+ */
+async function pushPositionNow() {
+  if (!sharing) return false;
+  if (!myCoords || Date.now() - myCoordsAt > 60000) {
+    try {
+      const p = await getCurrentPosition({ enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
+      myPos = { lat: p.lat, lng: p.lng };
+      myCoords = { latitude: p.lat, longitude: p.lng, speed: null, heading: null };
+      myCoordsAt = Date.now();
+      showMe(p.lat, p.lng);
+    } catch {
+      return false; // permesso negato o GPS muto: lo diciamo a chi ha attivato
+    }
+  }
+  lastShareAt = 0; // richiesta esplicita: niente throttle
+  return shareLive(myCoords);
 }
 
 /**
@@ -289,61 +337,191 @@ function openEventSheet(ev) {
 }
 const stat = (v, k) => el('div', { class: 'stat' }, [el('div', { class: 'v', text: v }), el('div', { class: 'k', text: k })]);
 
-/**
- * Attiva/disattiva il livello "live": mostra amici (sempre) e sconosciuti public.
- * Il polling delle vicinanze resta comunque attivo, perché serve al saluto col
- * clacson quando si incrocia un altro pilota; qui cambia solo la visibilità
- * dei marker sulla mappa.
- */
-async function toggleLive() {
+/* ============================================================
+ *  POSIZIONE LIVE — il tasto in basso a destra
+ *  Un tocco quando è spento: attivi la condivisione e gli amici ti vedono.
+ *  Un tocco quando è acceso: si apre il foglio "Posizione live" con chi è in
+ *  strada adesso (anche fuori dalla vista) e il tasto per smettere.
+ *  I puntini degli amici sono SEMPRE disegnati: era il vecchio "livello live",
+ *  spegnibile per sbaglio, a far sembrare la funzione rotta.
+ * ============================================================ */
+
+/** Aggiorna aspetto, etichette e contatore del tasto live. */
+function paintLiveFab() {
   const fab = $('#fab-live');
-  liveOn = !liveOn;
-  fab.classList.toggle('active', liveOn);
-  localStorage.setItem(LIVE_LAYER_KEY, liveOn ? 'on' : 'off');
-  if (!liveOn) {
-    markers.live.forEach((m) => m.remove());
-    markers.live.clear();
-    return;
-  }
-  await refreshLive();
-  await offerLiveSharing();
-  if (!markers.live.size) toast.info('Nessun amico sta condividendo la posizione in questo momento.', { duration: 3200 });
+  if (!fab) return;
+  const n = liveFriends.length;
+  fab.classList.toggle('active', sharing);
+  fab.setAttribute('aria-label', sharing ? 'Stai condividendo la posizione' : 'Condividi la posizione con gli amici');
+  fab.title = sharing
+    ? (n ? `Stai condividendo · ${n === 1 ? '1 amico' : `${n} amici`} in strada` : 'Stai condividendo la posizione')
+    : 'Condividi la tua posizione con gli amici';
+
+  // Contatore: si vede a colpo d'occhio se c'è qualcuno in strada, anche
+  // quando il suo puntino è fuori dalla vista.
+  let count = fab.querySelector('.fab-count');
+  if (n > 0) {
+    if (!count) { count = el('span', { class: 'fab-count' }); fab.append(count); }
+    count.textContent = n > 9 ? '9+' : String(n);
+  } else count?.remove();
 }
 
-/**
- * All'apertura, se il livello amici è attivo ma la mia posizione non è
- * condivisa, lo dico una volta per sessione: è la causa più comune del
- * "l'altro non mi vede". Un avviso leggero, senza bloccare la mappa.
- */
-function hintLiveSharing() {
-  if (!liveOn || auth.user?.live_enabled) return;
-  if (sessionStorage.getItem(LIVE_HINT_KEY)) return;
-  sessionStorage.setItem(LIVE_HINT_KEY, '1');
-  toast.info('Vedi gli amici, ma loro non vedono te: attiva "Condividi la mia posizione live" in Impostazioni.', { duration: 5200 });
+function onLiveFabClick() {
+  if (sharing) openLiveSheet();
+  else startSharing();
 }
 
-/**
- * Vedere gli altri non richiede nulla, farsi vedere sì: se il consenso è
- * spento lo proponiamo qui, con un tocco, invece di mandare in Impostazioni.
- * Chi dice no non viene più disturbato (scelta ricordata sul dispositivo).
- */
-async function offerLiveSharing() {
-  if (auth.user?.live_enabled) return;
-  if (localStorage.getItem(LIVE_ASK_KEY) === 'no') return;
-  const ok = await confirmDialog({
-    title: 'Farti vedere dagli amici?',
-    message: 'Stai vedendo chi condivide la posizione. Per comparire anche tu sulla loro mappa serve il tuo consenso: puoi revocarlo quando vuoi da Impostazioni.',
-    confirmText: 'Condividi posizione',
-    cancelText: 'Non ora',
-  });
-  if (!ok) { localStorage.setItem(LIVE_ASK_KEY, 'no'); return; }
+/** Attiva la condivisione e la fa partire davvero (consenso + prima posizione). */
+async function startSharing() {
+  const fab = $('#fab-live');
+  fab.disabled = true;
   try {
     await api.put('/live/settings', { live_enabled: true });
     auth.patchUser({ live_enabled: 1 });
-    lastShareAt = 0; // la prossima posizione GPS parte subito
-    toast.success('Condivisione attiva: gli amici ti vedranno sulla mappa.');
+    sharing = true;
+    paintLiveFab();
+
+    // Il consenso da solo non basta: senza una posizione a bordo server agli
+    // amici non compare nessun puntino.
+    const sent = await pushPositionNow();
+    await refreshLive();
+
+    if (!sent) {
+      toast.warning('Condivisione attiva, ma la posizione non arriva: controlla i permessi GPS del browser.', { duration: 5600 });
+    } else if (liveFriends.length) {
+      toast.success(`Ci sei: gli amici ti vedono. In strada adesso: ${liveFriends.length}.`);
+      if (!friendsInView()) openLiveSheet();
+    } else {
+      toast.success('Ci sei: gli amici ti vedono sulla mappa. Nessuno sta condividendo in questo momento: anche loro devono toccare questo tasto.', { duration: 6400 });
+    }
   } catch (err) {
     toast.error(err.message || 'Non è stato possibile attivare la condivisione.');
+  } finally {
+    fab.disabled = false;
+  }
+}
+
+/** Smette di condividere: la posizione viene cancellata dal server. */
+async function stopSharing() {
+  try {
+    await api.put('/live/settings', { live_enabled: false });
+    auth.patchUser({ live_enabled: 0 });
+    sharing = false;
+    lastShareOkAt = 0;
+    paintLiveFab();
+    toast.info('Condivisione disattivata: non sei più sulla mappa degli amici.');
+  } catch (err) {
+    toast.error(err.message || 'Non è stato possibile disattivare la condivisione.');
+  }
+}
+
+/** Alla prima apertura, se non condividi, spieghiamo a cosa serve il tasto. */
+function hintLiveSharing() {
+  if (sharing) return;
+  if (sessionStorage.getItem(LIVE_HINT_KEY)) return;
+  sessionStorage.setItem(LIVE_HINT_KEY, '1');
+  const extra = liveFriends.length ? ` ${liveFriends.length === 1 ? 'Un amico sta condividendo' : `${liveFriends.length} amici stanno condividendo`} adesso.` : '';
+  toast.info(`Tocca il segnaposto in basso a destra per farti vedere dagli amici.${extra}`, { duration: 5600 });
+}
+
+/** Vero se almeno un amico live è dentro la vista corrente. */
+function friendsInView() {
+  if (!liveFriends.length || !map) return false;
+  const b = map.getBounds();
+  return liveFriends.some((u) => b.contains([u.last_lng, u.last_lat]));
+}
+
+/** Inquadra tutti gli amici live (e me). */
+function fitLiveFriends() {
+  const pts = liveFriends.map((u) => [u.last_lat, u.last_lng]);
+  if (myPos) pts.push([myPos.lat, myPos.lng]);
+  if (!pts.length) return;
+  centered = true; // niente ricentramenti automatici sopra questa inquadratura
+  fitPoints(map, pts, { padding: 70, maxZoom: 15 });
+}
+
+/** Porta la mappa su un amico e apre il suo popup. */
+function focusFriend(u) {
+  centered = true;
+  map.flyTo({ center: [u.last_lng, u.last_lat], zoom: Math.max(map.getZoom(), 14), duration: 800 });
+  const mk = markers.live.get(u.id);
+  if (mk && !mk.getPopup()?.isOpen()) mk.togglePopup();
+}
+
+/** "Aggiornata adesso / N min fa" per l'ultimo invio andato a buon fine. */
+function shareAgoLabel() {
+  if (!lastShareOkAt) return 'in attesa della posizione GPS';
+  const s = Math.max(0, Math.round((Date.now() - lastShareOkAt) / 1000));
+  if (s < 60) return 'aggiornata adesso';
+  return `aggiornata ${Math.floor(s / 60)} min fa`;
+}
+
+/**
+ * Foglio "Posizione live": stato della mia condivisione + chi è in strada.
+ * Serve anche a raggiungere gli amici lontani, che restano fuori dalla vista.
+ */
+function openLiveSheet() {
+  if (liveSheet) return;
+  const body = el('div', {});
+  const fit = el('button', { class: 'btn btn-outline', text: 'Inquadra tutti' });
+  const stop = el('button', { class: 'btn btn-danger', text: 'Smetti di condividere' });
+
+  const render = () => {
+    body.innerHTML = '';
+    body.append(el('div', {
+      class: sharing ? 'pill green' : 'pill gray',
+      text: sharing ? `• Stai condividendo · ${shareAgoLabel()}` : '• Non stai condividendo',
+    }));
+
+    if (liveFriends.length) {
+      const list = el('div', { class: 'list', style: 'margin-top:var(--sp-3)' });
+      for (const u of liveFriends) list.append(liveFriendRow(u));
+      body.append(list);
+    } else {
+      body.append(el('div', { class: 'empty', style: 'margin-top:var(--sp-3)' }, [
+        el('div', { class: 'ic', text: '📍' }),
+        el('div', { class: 'li-title', text: 'Nessun amico in strada' }),
+        el('div', { class: 'text-lo mt-1', text: 'Compaiono qui appena toccano lo stesso tasto sulla loro mappa. La posizione si aggiorna da sola ogni pochi secondi.' }),
+      ]));
+    }
+    // Limite reale del web, meglio dirlo: col telefono bloccato o l'app chiusa
+    // il browser sospende il GPS e dopo pochi minuti spariamo dalla mappa.
+    if (sharing) {
+      body.append(el('div', {
+        class: 'text-lo',
+        style: 'font-size:.78rem;margin-top:var(--sp-3)',
+        text: 'Tieni l\'app aperta mentre guidi: a telefono bloccato la posizione smette di aggiornarsi dopo pochi minuti.',
+      }));
+    }
+    fit.hidden = !liveFriends.length;
+    stop.hidden = !sharing;
+  };
+
+  const m = modal({
+    title: 'Posizione live',
+    content: body,
+    footer: [fit, stop],
+    onClose: () => { liveSheet = null; },
+  });
+  fit.addEventListener('click', () => { m.close(); fitLiveFriends(); });
+  stop.addEventListener('click', async () => { m.close(); await stopSharing(); });
+
+  liveSheet = { close: m.close, render };
+  render();
+
+  function liveFriendRow(u) {
+    const dist = myPos ? fmtDistance(haversine(myPos.lat, myPos.lng, u.last_lat, u.last_lng)) : null;
+    const sub = [dist, `online da ${fmtSince(u.live_since || u.last_seen)}`].filter(Boolean).join(' · ');
+    const row = el('button', { class: 'list-item', style: 'width:100%;text-align:left' }, [
+      el('img', { class: 'avatar', src: u.avatar || '/images/avatars/default.svg', alt: '' }),
+      el('div', { class: 'li-body' }, [
+        el('div', { class: 'li-title truncate', text: u.nickname }),
+        el('div', { class: 'li-sub', text: sub }),
+      ]),
+      el('span', { class: 'chev', html: svg('crosshair', 18) }),
+    ]);
+    row.addEventListener('click', () => { m.close(); focusFriend(u); });
+    return row;
   }
 }
 
@@ -431,10 +609,13 @@ function livePopupHtml(u) {
 
 async function refreshLive() {
   try {
+    // Il bbox filtra solo gli sconosciuti: gli amici che condividono arrivano
+    // sempre, anche lontani (li si raggiunge dal foglio "Posizione live").
     const { users } = await api.get('/live/nearby', { bbox: viewportBbox(map) });
-    // Il clacson di saluto funziona anche col livello live spento.
     checkHorn(users || []);
-    if (!liveOn) return;
+    liveFriends = (users || []).filter((u) => u.is_friend);
+    paintLiveFab();
+    liveSheet?.render();
     const seen = new Set();
     for (const u of users || []) {
       seen.add(u.id);
