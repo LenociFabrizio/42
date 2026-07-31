@@ -14,6 +14,7 @@ import { $, svg, loader, toast, modal, el, esc, fmtDistance, fmtDuration, fmtSpe
 import { catIcon, poiIcon, catLabel, vehIcon, DEFAULT_MAP_RADIUS_KM } from '../core/constants.js';
 import { initSound, playNotify } from '../core/sound.js';
 import { showDirections } from '../core/nav.js';
+import { showRideDisclaimer } from '../core/disclaimer.js';
 import api from '../core/api.js';
 
 let map;
@@ -54,6 +55,8 @@ async function main() {
 
   // Tutorial di benvenuto alla prima apertura dopo la registrazione.
   maybeAutoStart();
+  // Avviso di guida responsabile all'ingresso (una volta per sessione).
+  showRideDisclaimer();
 
   map.on('load', () => {
     locate(false);
