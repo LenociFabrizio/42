@@ -17,6 +17,23 @@ function extractToken(req) {
   return null;
 }
 
+/**
+ * "Battito" di presenza: segna l'utente come attivo adesso. Scrive al massimo
+ * una volta al minuto (il client interroga l'API ogni 30s) per non appesantire
+ * ogni richiesta. È indipendente da last_seen, che riguarda solo la
+ * condivisione live della posizione.
+ */
+const PRESENCE_TOUCH_MS = 60 * 1000;
+async function touchPresence(user) {
+  const last = user.last_active ? Date.parse(`${String(user.last_active).replace(' ', 'T')}Z`) : NaN;
+  if (!Number.isNaN(last) && Date.now() - last < PRESENCE_TOUCH_MS) return;
+  try {
+    await db.prepare("UPDATE users SET last_active = datetime('now') WHERE id = ?").run(user.id);
+  } catch {
+    /* la presenza è un extra: se fallisce, la richiesta prosegue */
+  }
+}
+
 /** Richiede un utente autenticato. Popola req.user con il record dal DB. */
 export async function requireAuth(req, _res, next) {
   const token = extractToken(req);
@@ -26,6 +43,7 @@ export async function requireAuth(req, _res, next) {
     const user = await db.prepare('SELECT * FROM users WHERE id = ? AND is_active = 1').get(payload.id);
     if (!user) return next(new HttpError(401, 'Utente non valido'));
     req.user = user;
+    await touchPresence(user);
     next();
   } catch {
     next(new HttpError(401, 'Token non valido o scaduto'));

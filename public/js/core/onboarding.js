@@ -17,7 +17,7 @@ const SLIDES = [
   {
     ic: 'map',
     title: 'La Mappa è la tua base',
-    text: 'Attorno a te trovi percorsi, eventi e punti di interesse. Il pulsante con il mirino ti ricentra sulla tua posizione; quanto "vicino" si apre la mappa lo decidi tu dal raggio di visibilità in Impostazioni.',
+    text: 'Si apre già centrata su di te: attorno trovi percorsi, eventi e punti di interesse. Il pulsante con il mirino ti riporta sulla tua posizione quando ti sposti a mano, e quanto "vicino" parte la mappa lo decidi dal raggio di visibilità in Impostazioni.',
   },
   {
     ic: 'navigation',
@@ -40,9 +40,14 @@ const SLIDES = [
     text: 'Quando arrivi entro 1 km da un percorso o dal ritrovo di un evento ti avvisiamo con un suono e un messaggio: puoi accettare al volo e fare il check-in GPS. Il suono si disattiva da Impostazioni.',
   },
   {
+    ic: 'pinUser',
+    title: 'Dove sono gli altri',
+    text: 'Il tasto col segnaposto, in basso a destra, mostra chi è in strada in questo momento: è attivo di serie. Tocca un puntino per sapere che auto o moto sta guidando e da quanto è online. Per comparire anche tu serve il tuo consenso: te lo chiediamo al primo tocco, oppure lo attivi da Impostazioni → Live Map.',
+  },
+  {
     ic: 'users',
-    title: 'Live Map: chi è in strada',
-    text: 'Con il consenso attivo vedi gli altri piloti in movimento. Tocca il puntino di qualcuno per sapere subito che auto o moto sta guidando e da quanto tempo è online, senza uscire dalla mappa.',
+    title: 'Amici: chi c\'è e chi no',
+    text: 'Nella lista Amici vedi chi è online adesso e, per gli altri, da quanto tempo sono offline. Quando un amico entra nell\'app te lo diciamo con un avviso e un blip breve: se preferisci il silenzio, spegni i suoni da Impostazioni.',
   },
   {
     ic: 'building',
@@ -57,7 +62,12 @@ const SLIDES = [
   {
     ic: 'lock',
     title: 'Privacy sotto controllo',
-    text: 'La tua posizione è condivisa solo se lo attivi tu, e agli sconosciuti appari solo dal livello 5. Puoi entrare con email o con Google e cambiare ogni preferenza da Impostazioni. Buon viaggio!',
+    text: 'La tua posizione è condivisa solo se lo attivi tu, e agli sconosciuti appari solo dal livello 5. Puoi entrare con email o con Google e cambiare ogni preferenza da Impostazioni.',
+  },
+  {
+    ic: 'alert',
+    title: 'Qualcosa non va? Dillo',
+    text: 'Siamo in Beta: da Impostazioni → Assistenza tocca "Segnala un bug" e scrivici cosa è andato storto. Il messaggio arriva direttamente a noi, senza aprire la posta. Buon viaggio!',
   },
 ];
 

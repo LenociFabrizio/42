@@ -10,7 +10,7 @@ import '../core/theme.js';
 import { guard } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
-import { $, el, svg, loader, toast, timeAgo, qs } from '../core/ui.js';
+import { $, el, svg, loader, toast, timeAgo, fmtSince, fmtDate, qs } from '../core/ui.js';
 import api from '../core/api.js';
 
 const DEFAULT_AVATAR = '/images/avatars/default.svg';
@@ -92,9 +92,16 @@ async function loadFriends() {
 }
 
 function friendRow(f) {
+  // Offline: mostriamo da quanto tempo lo è (con la data esatta nel tooltip).
+  const last = f.last_active || f.last_seen;
   const status = f.online
     ? el('span', { class: 'pill green', text: '• Online' })
-    : el('span', { class: 'li-sub', text: f.last_seen ? `Visto ${timeAgo(f.last_seen)}` : 'Offline' });
+    : el('span', {
+      class: 'li-sub',
+      style: 'white-space:nowrap; text-align:right',
+      text: last ? `Offline da ${fmtSince(last)}` : 'Offline',
+      title: last ? `Ultima attività: ${fmtDate(last, { withTime: true })}` : 'Mai visto online',
+    });
   // Riga = link al profilo (usa l'ID UTENTE). Nessuna rimozione qui:
   // GET /friends non fornisce l'ID amicizia richiesto da DELETE /friends/:id.
   return el('a', { class: 'list-item', href: `/profile.html?id=${f.id}` }, [

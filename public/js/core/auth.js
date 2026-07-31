@@ -4,6 +4,11 @@
 import api, { token } from './api.js';
 
 const USER_KEY = '4e2_user';
+const USER_AT_KEY = '4e2_user_at';
+// Oltre questo tempo la copia locale dell'utente è considerata vecchia e viene
+// riallineata in background: senza questo, flag come live_enabled (attivato in
+// Impostazioni) restavano indietro e la posizione live non partiva più.
+const USER_STALE_MS = 60 * 1000;
 
 export const auth = {
   _user: null,
@@ -18,8 +23,26 @@ export const auth = {
   },
   set user(u) {
     this._user = u;
-    if (u) localStorage.setItem(USER_KEY, JSON.stringify(u));
-    else localStorage.removeItem(USER_KEY);
+    if (u) {
+      localStorage.setItem(USER_KEY, JSON.stringify(u));
+      localStorage.setItem(USER_AT_KEY, String(Date.now()));
+    } else {
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(USER_AT_KEY);
+    }
+  },
+
+  /** Aggiorna solo alcuni campi della copia locale (es. dopo un toggle). */
+  patchUser(patch) {
+    if (!this.user) return null;
+    this.user = { ...this.user, ...patch };
+    return this.user;
+  },
+
+  /** Vero se la copia locale dell'utente è più vecchia di USER_STALE_MS. */
+  isStale() {
+    const at = Number(localStorage.getItem(USER_AT_KEY) || 0);
+    return !at || Date.now() - at > USER_STALE_MS;
   },
 
   isLogged() { return !!token.get(); },
@@ -37,9 +60,11 @@ export const auth = {
       this.user = data.user || data;
       this._unread = data.unread ?? 0;
       return this.user;
-    } catch {
-      this.logout(false);
-      return null;
+    } catch (err) {
+      // Solo un token rifiutato chiude la sessione: offline o server giù
+      // teniamo la copia locale (siamo una PWA, deve funzionare senza rete).
+      if (err?.status === 401) { this.logout(false); return null; }
+      return this.user;
     }
   },
 
@@ -72,7 +97,11 @@ export async function guard({ minLevel = 0 } = {}) {
     location.href = `/login.html?next=${next}`;
     return null;
   }
-  const user = auth.user || (await auth.refresh());
+  let user = auth.user;
+  if (!user) user = await auth.refresh();
+  // C'è già una copia locale: la pagina parte subito, ma se è vecchia la
+  // riallineiamo in background (livello, XP, consenso alla posizione live…).
+  else if (auth.isStale()) auth.refresh();
   if (!user) { location.href = '/login.html'; return null; }
   return user;
 }

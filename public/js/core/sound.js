@@ -57,13 +57,16 @@ export function initSound() {
  * @param {number} o.duration   durata (s)
  * @param {number} [o.gain]     volume di picco (0-1)
  * @param {string} [o.type]     forma d'onda
+ * @param {number} [o.to]       se presente, la nota "scivola" fino a questa
+ *                              frequenza (glissando) invece di restare fissa
  */
-function note(c, { freq, start, duration, gain = 0.18, type = 'sine' }) {
+function note(c, { freq, start, duration, gain = 0.18, type = 'sine', to = null }) {
   const t0 = c.currentTime + start;
   const osc = c.createOscillator();
   const vol = c.createGain();
   osc.type = type;
   osc.frequency.setValueAtTime(freq, t0);
+  if (to) osc.frequency.exponentialRampToValueAtTime(to, t0 + duration);
   // Inviluppo morbido: evita il "click" di attacco/rilascio.
   vol.gain.setValueAtTime(0.0001, t0);
   vol.gain.exponentialRampToValueAtTime(gain, t0 + 0.02);
@@ -126,4 +129,20 @@ export function playHorn() {
   try { navigator.vibrate?.([50, 70, 50]); } catch { /* non supportato */ }
 }
 
-export default { initSound, playNotify, playBeep, playHorn, soundEnabled, setSoundEnabled };
+/**
+ * "Blip" di amico online: un solo tocco leggero che scivola verso l'alto
+ * (timbro triangolare). Diverso da campanello, countdown e clacson: si
+ * riconosce subito e non disturba mentre si guida.
+ */
+export function playFriendOnline() {
+  if (!soundEnabled()) return;
+  const c = audioCtx();
+  if (!c) return;
+  if (c.state === 'suspended') c.resume().catch(() => {});
+  try {
+    note(c, { freq: 587.33, to: 1174.66, start: 0, duration: 0.16, gain: 0.13, type: 'triangle' });
+  } catch { /* audio non disponibile: silenzio */ }
+  try { navigator.vibrate?.(25); } catch { /* non supportato */ }
+}
+
+export default { initSound, playNotify, playBeep, playHorn, playFriendOnline, soundEnabled, setSoundEnabled };

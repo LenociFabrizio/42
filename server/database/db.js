@@ -136,6 +136,11 @@ async function runMigrations() {
   if (userCols.length && !hasUserCol('live_vehicle_id')) {
     await db.run('ALTER TABLE users ADD COLUMN live_vehicle_id INTEGER');
   }
+  // Presenza nell'app (vedi middleware/auth.js): "online" e "offline da quanto"
+  // nella lista amici non dipendono più dalla condivisione live.
+  if (userCols.length && !hasUserCol('last_active')) {
+    await db.run('ALTER TABLE users ADD COLUMN last_active TEXT');
+  }
 
   // Preferenze di navigazione (evita pedaggi, autostrade, ZTL, traghetti).
   const setCols = await db.all('PRAGMA table_info(user_settings)');

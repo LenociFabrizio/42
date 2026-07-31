@@ -10,8 +10,8 @@ import { registerPWA } from '../core/pwa.js';
 import { createMap, addMarker, viewportBbox, fitRadius } from '../core/map.js';
 import { getCurrentPosition, decodePolyline, haversine } from '../core/geo.js';
 import { maybeAutoStart } from '../core/onboarding.js';
-import { $, svg, loader, toast, modal, el, esc, fmtDistance, fmtDuration, fmtSpeed, fmtSince, debounce } from '../core/ui.js';
-import { catIcon, poiIcon, catLabel, vehIcon, DEFAULT_MAP_RADIUS_KM } from '../core/constants.js';
+import { $, svg, loader, toast, modal, confirmDialog, el, esc, fmtDistance, fmtDuration, fmtSpeed, fmtSince, debounce } from '../core/ui.js';
+import { catIcon, poiIcon, catLabel, vehIcon, DEFAULT_MAP_RADIUS_KM, DRIVE_MODE_ENABLED } from '../core/constants.js';
 import { initSound, playNotify, playHorn } from '../core/sound.js';
 import { showDirections } from '../core/nav.js';
 import { showRideDisclaimer } from '../core/disclaimer.js';
@@ -19,12 +19,21 @@ import api from '../core/api.js';
 
 let map;
 let userMarker = null;
-let liveOn = false;
+// Livello "dove sono gli amici": attivo per impostazione predefinita (è il
+// senso della mappa) e ricordato sul dispositivo.
+const LIVE_LAYER_KEY = '4e2_live_layer';
+const LIVE_ASK_KEY = '4e2_live_ask';
+const LIVE_HINT_KEY = '4e2_live_hint';
+let liveOn = localStorage.getItem(LIVE_LAYER_KEY) !== 'off';
 let watchId = null;
 let lastShareAt = 0;       // throttle invio posizione live
 
 let mapRadiusKm = DEFAULT_MAP_RADIUS_KM; // raggio di visibilità (Impostazioni)
 let myPos = null;          // ultima posizione nota (per il saluto col clacson)
+let myCoords = null;       // ultime coordinate GPS complete (per il battito live)
+// Ultima posizione salvata: apre la mappa già dalle tue parti, senza attese.
+const LAST_POS_KEY = '4e2_last_pos';
+let centered = false;      // la mappa è già stata inquadrata su di me?
 
 // Prossimità: raggio MASSIMO entro cui può comparire l'avviso (1 km) e
 // margine extra usato solo per farlo sparire senza sfarfallii.
@@ -46,8 +55,17 @@ async function main() {
   initSound(); // sblocca l'audio al primo tocco (policy autoplay)
 
   $('#fab-locate').innerHTML = svg('crosshair', 22);
-  $('#fab-live').innerHTML = svg('users', 22);
-  $('#fab-drive').innerHTML = svg('navigation', 22);
+  // Segnaposto con una persona dentro: si capisce a colpo d'occhio che mostra
+  // "dove sono" gli amici, non solo "gli amici".
+  $('#fab-live').innerHTML = svg('pinUser', 22);
+  $('#fab-live').classList.toggle('active', liveOn);
+  // Solo Mappa: funzionalità sospesa, il tasto resta fuori dal DOM.
+  const fabDrive = $('#fab-drive');
+  if (DRIVE_MODE_ENABLED) {
+    fabDrive.hidden = false;
+    fabDrive.innerHTML = svg('navigation', 22);
+    fabDrive.addEventListener('click', () => (location.href = '/drive.html'));
+  } else fabDrive.remove();
 
   // Il raggio preferito serve già alla prima inquadratura.
   const [createdMap] = await Promise.all([createMap('map'), loadMapRadius()]);
@@ -60,20 +78,23 @@ async function main() {
   showRideDisclaimer();
 
   map.on('load', () => {
-    locate(false);
+    centerOnMe();
     reload();
     startWatch();
     // Vicinanze: sempre in ascolto (serve al saluto col clacson), i marker
     // compaiono solo col livello live attivo.
-    refreshLive();
+    refreshLive().then(hintLiveSharing);
     clearInterval(home._liveTimer);
     home._liveTimer = setInterval(refreshLive, 8000);
+    // Battito della posizione: da fermi il GPS può non richiamarci per minuti e
+    // agli amici scomparirei dalla mappa (la finestra "live" è di 5 minuti).
+    clearInterval(home._shareTimer);
+    home._shareTimer = setInterval(() => { if (myCoords) shareLive(myCoords); }, 60000);
   });
   map.on('moveend', debounce(reload, 400));
 
   $('#fab-locate').addEventListener('click', () => locate(true));
   $('#fab-live').addEventListener('click', toggleLive);
-  $('#fab-drive').addEventListener('click', () => (location.href = '/drive.html'));
 }
 
 /** Segue la posizione (aggiorna il marker "tu") e valuta la prossimità. */
@@ -83,8 +104,11 @@ function startWatch() {
     (pos) => {
       const lat = pos.coords.latitude, lng = pos.coords.longitude;
       myPos = { lat, lng };
-      if (userMarker) userMarker.setLngLat([lng, lat]);
-      else userMarker = addMarker(map, { lat, lng, className: 'mk-user pulse' });
+      myCoords = pos.coords;
+      showMe(lat, lng);
+      // Se l'inquadratura iniziale non è ancora riuscita (permesso concesso
+      // in ritardo, primo fix lento), il primo aggiornamento centra la mappa.
+      if (!centered) { centered = true; fitRadius(map, lat, lng, mapRadiusKm, { animate: true }); }
       checkProximity(lat, lng);
       shareLive(pos.coords);
     },
@@ -110,9 +134,12 @@ async function shareLive(coords) {
       speed: Number.isFinite(coords.speed) && coords.speed >= 0 ? coords.speed * 3.6 : null,
       heading: Number.isFinite(coords.heading) ? coords.heading : null,
     });
-  } catch {
-    // Consenso revocato o rete assente: riprova al prossimo aggiornamento.
-    lastShareAt = now;
+  } catch (err) {
+    // Rete assente: riprova al prossimo aggiornamento GPS, senza aspettare il
+    // throttle. Se invece il server dice "consenso spento" (403) allineiamo la
+    // copia locale, altrimenti continueremmo a bussare a vuoto.
+    lastShareAt = 0;
+    if (err?.status === 403) auth.patchUser({ live_enabled: 0 });
   }
 }
 
@@ -121,15 +148,43 @@ async function shareLive(coords) {
  * L'inquadratura usa il raggio di visibilità scelto in Impostazioni
  * (default: vista ravvicinata), non uno zoom fisso.
  */
-async function locate(fly = true) {
+async function locate(fly = true, opts) {
   try {
-    const pos = await getCurrentPosition();
-    if (userMarker) userMarker.setLngLat([pos.lng, pos.lat]);
-    else userMarker = addMarker(map, { lat: pos.lat, lng: pos.lng, className: 'mk-user pulse' });
-    fitRadius(map, pos.lat, pos.lng, mapRadiusKm, { animate: fly });
+    const pos = await getCurrentPosition(opts);
+    showMe(pos.lat, pos.lng);
+    // Col tasto si inquadra sempre; all'avvio no, se il GPS ci ha già pensato.
+    if (fly || !centered) fitRadius(map, pos.lat, pos.lng, mapRadiusKm, { animate: fly });
+    centered = true;
   } catch {
     if (fly) toast.warning('Posizione non disponibile. Controlla i permessi GPS.');
   }
+}
+
+/** Marker "tu" + memoria dell'ultima posizione (per la prossima apertura). */
+function showMe(lat, lng) {
+  if (userMarker) userMarker.setLngLat([lng, lat]);
+  else userMarker = addMarker(map, { lat, lng, className: 'mk-user pulse' });
+  try { localStorage.setItem(LAST_POS_KEY, JSON.stringify({ lat, lng })); } catch { /* quota */ }
+}
+
+/**
+ * Inquadratura di partenza: la mappa deve aprirsi SEMPRE su di te, senza
+ * dover toccare il tasto "la mia posizione".
+ * 1) l'ultima posizione nota dà subito la vista giusta (nessuna attesa);
+ * 2) in parallelo si chiede al GPS il punto reale, con parametri "morbidi"
+ *    (accetta una posizione recente: è molto più rapida del fix preciso);
+ * 3) se il permesso arriva tardi o il primo tentativo scade, ci pensa il
+ *    primo aggiornamento di startWatch() (vedi `centered`).
+ */
+async function centerOnMe() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_POS_KEY) || 'null');
+    if (saved && Number.isFinite(saved.lat) && Number.isFinite(saved.lng)) {
+      showMe(saved.lat, saved.lng);
+      fitRadius(map, saved.lat, saved.lng, mapRadiusKm, { animate: false });
+    }
+  } catch { /* niente in memoria: si aspetta il GPS */ }
+  await locate(false, { enableHighAccuracy: false, timeout: 20000, maximumAge: 120000 });
 }
 
 /** Legge il raggio di visibilità preferito (Impostazioni), con fallback. */
@@ -244,12 +299,52 @@ async function toggleLive() {
   const fab = $('#fab-live');
   liveOn = !liveOn;
   fab.classList.toggle('active', liveOn);
+  localStorage.setItem(LIVE_LAYER_KEY, liveOn ? 'on' : 'off');
   if (!liveOn) {
     markers.live.forEach((m) => m.remove());
     markers.live.clear();
     return;
   }
   await refreshLive();
+  await offerLiveSharing();
+  if (!markers.live.size) toast.info('Nessun amico sta condividendo la posizione in questo momento.', { duration: 3200 });
+}
+
+/**
+ * All'apertura, se il livello amici è attivo ma la mia posizione non è
+ * condivisa, lo dico una volta per sessione: è la causa più comune del
+ * "l'altro non mi vede". Un avviso leggero, senza bloccare la mappa.
+ */
+function hintLiveSharing() {
+  if (!liveOn || auth.user?.live_enabled) return;
+  if (sessionStorage.getItem(LIVE_HINT_KEY)) return;
+  sessionStorage.setItem(LIVE_HINT_KEY, '1');
+  toast.info('Vedi gli amici, ma loro non vedono te: attiva "Condividi la mia posizione live" in Impostazioni.', { duration: 5200 });
+}
+
+/**
+ * Vedere gli altri non richiede nulla, farsi vedere sì: se il consenso è
+ * spento lo proponiamo qui, con un tocco, invece di mandare in Impostazioni.
+ * Chi dice no non viene più disturbato (scelta ricordata sul dispositivo).
+ */
+async function offerLiveSharing() {
+  if (auth.user?.live_enabled) return;
+  if (localStorage.getItem(LIVE_ASK_KEY) === 'no') return;
+  const ok = await confirmDialog({
+    title: 'Farti vedere dagli amici?',
+    message: 'Stai vedendo chi condivide la posizione. Per comparire anche tu sulla loro mappa serve il tuo consenso: puoi revocarlo quando vuoi da Impostazioni.',
+    confirmText: 'Condividi posizione',
+    cancelText: 'Non ora',
+  });
+  if (!ok) { localStorage.setItem(LIVE_ASK_KEY, 'no'); return; }
+  try {
+    await api.put('/live/settings', { live_enabled: true });
+    auth.patchUser({ live_enabled: 1 });
+    lastShareAt = 0; // la prossima posizione GPS parte subito
+    toast.success('Condivisione attiva: gli amici ti vedranno sulla mappa.');
+  } catch (err) {
+    toast.error(err.message || 'Non è stato possibile attivare la condivisione.');
+  }
 }
 
 /* ---------------- Saluto col clacson ----------------

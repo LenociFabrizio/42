@@ -1,8 +1,9 @@
 /* =============================================================
    settings.js — Impostazioni account.
-   Sezioni: Aspetto (tema/lingua/unità), Privacy, Live Map,
-   Notifiche, Account. Ogni modifica è salvata subito (autosave)
-   con conferma via toast.
+   Sezioni: Aspetto (tema/lingua/unità), Mappa, Navigazione, Privacy,
+   Live Map, Tracciamento, Notifiche, Suoni, Guida, Assistenza
+   (segnala un bug), Account. Ogni modifica è salvata subito
+   (autosave) con conferma via toast.
    ============================================================= */
 import '../core/theme.js';
 import { setTheme } from '../core/theme.js';
@@ -12,9 +13,10 @@ import { registerPWA } from '../core/pwa.js';
 import { $, el, svg, loader, toast, modal, confirmDialog, debounce } from '../core/ui.js';
 import { LIVE_MAP_MIN_LEVEL, MAP_RADIUS_OPTIONS, DEFAULT_MAP_RADIUS_KM } from '../core/constants.js';
 import { startTutorial } from '../core/onboarding.js';
+import { openBugReport } from '../core/bugreport.js';
 import { bgEnabled, setBgEnabled } from '../core/tracking.js';
 import { resetNavPrefs } from '../core/nav.js';
-import { soundEnabled, setSoundEnabled, playNotify, playBeep, playHorn, initSound } from '../core/sound.js';
+import { soundEnabled, setSoundEnabled, playNotify, playBeep, playHorn, playFriendOnline, initSound } from '../core/sound.js';
 import api, { token } from '../core/api.js';
 
 const VIS = [
@@ -67,6 +69,7 @@ function build(root, s, me) {
     notifyCard(s),
     soundCard(),
     guideCard(),
+    supportCard(),
     accountCard(me),
     el('div', { class: 'legal-footer', html: '<a href="/privacy.html">Privacy</a><a href="/cookie.html">Cookie</a><a href="/terms.html">Termini</a>' }),
   );
@@ -115,7 +118,7 @@ function trackingCard() {
   });
   return card('Tracciamento', [
     el('label', { class: 'checkbox', style: 'padding:6px 0' }, [chk, el('span', { text: 'Continua a tracciare in background' })]),
-    el('div', { class: 'text-lo', style: 'font-size:.78rem;margin-top:6px', text: "Durante la registrazione di un percorso e in modalità Solo Mappa mostra una notifica e mantiene l'app attiva (Wake Lock). Nota: per limiti dei browser, con schermo spento o app chiusa il tracciamento web può interrompersi — solo un'app nativa traccia sempre in background." }),
+    el('div', { class: 'text-lo', style: 'font-size:.78rem;margin-top:6px', text: "Durante la registrazione di un percorso mostra una notifica e mantiene l'app attiva (Wake Lock). Nota: per limiti dei browser, con schermo spento o app chiusa il tracciamento web può interrompersi — solo un'app nativa traccia sempre in background." }),
   ]);
 }
 
@@ -124,6 +127,19 @@ function guideCard() {
   return card('Guida', [
     el('div', { class: 'text-lo', style: 'font-size:.82rem;margin-bottom:10px', text: "Ripeti il tutorial introduttivo dell'app." }),
     el('button', { class: 'btn btn-outline btn-block', text: 'Rivedi il tutorial', onClick: () => startTutorial() }),
+  ]);
+}
+
+/* -------------------- Assistenza -------------------- */
+/** Segnalazione di bug: il testo parte dal server, senza aprire la posta. */
+function supportCard() {
+  return card('Assistenza', [
+    el('div', { class: 'text-lo', style: 'font-size:.82rem;margin-bottom:10px', text: "Qualcosa non funziona? Raccontacelo: la segnalazione arriva direttamente a noi, senza uscire dall'app." }),
+    el('button', {
+      class: 'btn btn-outline btn-block',
+      html: `${svg('alert', 20)} Segnala un bug`,
+      onClick: () => openBugReport(),
+    }),
   ]);
 }
 
@@ -202,6 +218,9 @@ function liveCard(me) {
     const want = chk.checked;
     try {
       await api.put('/live/settings', { live_enabled: want });
+      // Allinea la copia locale dell'utente: la mappa legge questo flag per
+      // decidere se inviare la posizione, altrimenti resterebbe indietro.
+      auth.patchUser({ live_enabled: want ? 1 : 0 });
       toast.success(want ? 'Condivisione live attivata' : 'Condivisione live disattivata', { duration: 1500 });
     } catch (err) {
       chk.checked = !want; // ripristina in caso di errore (es. livello insufficiente)
@@ -282,14 +301,15 @@ function soundCard() {
     el('button', { class: 'btn btn-outline btn-sm', html: `${svg('bell', 16)} Avviso`, onClick: () => playNotify() }),
     el('button', { class: 'btn btn-outline btn-sm', html: `${svg('flag', 16)} Partenza`, onClick: () => playBeep(true) }),
     el('button', { class: 'btn btn-outline btn-sm', html: `${svg('users', 16)} Clacson`, onClick: () => playHorn() }),
+    el('button', { class: 'btn btn-outline btn-sm', html: `${svg('pinUser', 16)} Amico online`, onClick: () => playFriendOnline() }),
   ]);
   const note = el('div', { class: 'text-lo', style: 'font-size:.78rem;margin-top:8px' });
 
   function render() {
     const on = soundEnabled();
     note.textContent = on
-      ? 'Riguarda gli avvisi di prossimità (percorso o evento entro 1 km), il countdown di partenza e il clacson di saluto quando incroci un altro pilota. Vale solo su questo dispositivo.'
-      : 'Tutti i suoni sono silenziati: avvisi di prossimità, countdown di partenza e clacson di saluto. Vale solo su questo dispositivo.';
+      ? 'Riguarda gli avvisi di prossimità (percorso o evento entro 1 km), il countdown di partenza, il clacson di saluto quando incroci un altro pilota e il blip quando un amico va online. Vale solo su questo dispositivo.'
+      : 'Tutti i suoni sono silenziati: avvisi di prossimità, countdown di partenza, clacson di saluto e blip "amico online". Vale solo su questo dispositivo.';
     test.querySelectorAll('button').forEach((b) => { b.disabled = !on; });
   }
   render();

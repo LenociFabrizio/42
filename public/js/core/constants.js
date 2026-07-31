@@ -3,6 +3,11 @@
    soglie, opzioni, mappe icona→nome). Le icone sono nomi del set
    SVG a tema (vedi icons.js), non emoji.
    ============================================================= */
+/* Modalità "Solo Mappa" (minimappa stile arcade): temporaneamente disattivata.
+   Il tasto flottante non viene mostrato e /drive.html rimanda alla mappa.
+   Per riattivarla basta rimettere questo flag a true. */
+export const DRIVE_MODE_ENABLED = false;
+
 export const LIVE_MAP_MIN_LEVEL = 5;
 export const LIVE_ENABLED_TIP = `La posizione live con gli amici è sempre disponibile (con consenso). Per essere visibile agli sconosciuti (visibilità "pubblica") serve il livello ${LIVE_MAP_MIN_LEVEL}.`;
 

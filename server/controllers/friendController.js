@@ -3,7 +3,8 @@
  * ------------------------------------------------------------
  * Sistema di amicizie: invio/accettazione/rifiuto richieste, elenco
  * amici, richieste in sospeso e presenza "online" (basata su
- * users.last_seen). Ogni amicizia accettata assegna XP social a
+ * users.last_active, aggiornato a ogni richiesta autenticata; per i dati
+ * storici vale anche users.last_seen). Ogni amicizia accettata assegna XP social a
  * ENTRAMBI gli utenti e rivaluta i badge (gamification social).
  * ------------------------------------------------------------
  */
@@ -14,18 +15,48 @@ import { FRIEND_STATUS, XP } from '../utils/constants.js';
 import { awardXp, checkBadges } from '../services/gamification.js';
 import { notify } from '../services/notifications.js';
 
-// Finestra di presenza: un utente è "online" se visto negli ultimi 5 minuti.
+// Finestra di presenza: un utente è "online" se attivo negli ultimi 5 minuti.
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 /**
- * Calcola se un utente è online confrontando il suo last_seen (stringa ISO)
- * con l'istante corrente. Ritorna false se assente o non valido.
+ * Interpreta un timestamp del DB ("YYYY-MM-DD HH:MM:SS", UTC) o una stringa
+ * ISO. SQLite non mette la "Z": senza aggiungerla il valore verrebbe letto
+ * come ora locale del server. Ritorna NaN se non valido.
  */
-function isOnline(lastSeen) {
-  if (!lastSeen) return false;
-  const t = new Date(lastSeen).getTime();
+function dbTime(value) {
+  if (!value) return NaN;
+  const s = String(value).trim();
+  const naive = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(s);
+  return Date.parse(naive ? `${s.replace(' ', 'T')}Z` : s);
+}
+
+/**
+ * Ultimo istante di presenza: l'attività nell'app (last_active) e, per
+ * retrocompatibilità con i dati già raccolti, l'ultimo ping live (last_seen).
+ * @returns {string|null} il più recente dei due, o null.
+ */
+function lastPresence(u) {
+  const a = dbTime(u.last_active);
+  const b = dbTime(u.last_seen);
+  if (Number.isNaN(a)) return Number.isNaN(b) ? null : u.last_seen;
+  if (Number.isNaN(b)) return u.last_active;
+  return a >= b ? u.last_active : u.last_seen;
+}
+
+/** Vero se l'istante di presenza cade entro la finestra "online". */
+function isOnline(value) {
+  const t = dbTime(value);
   if (Number.isNaN(t)) return false;
   return Date.now() - t <= ONLINE_WINDOW_MS;
+}
+
+/**
+ * Arricchisce una riga amico con la presenza per la UI:
+ * `online` e `last_active` (l'istante da cui calcolare "offline da…").
+ */
+function withPresence(u) {
+  const last = lastPresence(u);
+  return { ...u, last_active: last, online: isOnline(last) };
 }
 
 /**
@@ -48,7 +79,7 @@ async function friendshipBetween(aId, bId) {
 async function acceptedFriends(userId) {
   return db
     .prepare(
-      `SELECT u.id, u.nickname, u.avatar, u.level, u.last_seen
+      `SELECT u.id, u.nickname, u.avatar, u.level, u.last_seen, u.last_active
          FROM friendships f
          JOIN users u
            ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
@@ -93,7 +124,7 @@ async function acceptFriendship(friendship, accepter) {
 export const listFriends = asyncHandler(async (req, res) => {
   const rows = await acceptedFriends(req.user.id);
   const friends = rows
-    .map((u) => ({ ...u, online: isOnline(u.last_seen) }))
+    .map(withPresence)
     .sort((a, b) => Number(b.online) - Number(a.online) || a.nickname.localeCompare(b.nickname));
   res.json({ friends });
 });
@@ -102,7 +133,7 @@ export const listFriends = asyncHandler(async (req, res) => {
 export const listOnline = asyncHandler(async (req, res) => {
   const rows = await acceptedFriends(req.user.id);
   const friends = rows
-    .map((u) => ({ ...u, online: isOnline(u.last_seen) }))
+    .map(withPresence)
     .filter((u) => u.online)
     .sort((a, b) => a.nickname.localeCompare(b.nickname));
   res.json({ friends });

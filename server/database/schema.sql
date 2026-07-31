@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS users (
   last_speed          REAL,
   last_heading        REAL,
   last_seen           TEXT,
+  -- Presenza nell'app (indipendente dalla condivisione live): aggiornata a ogni
+  -- richiesta autenticata. Serve a mostrare agli amici "online" / "offline da".
+  last_active         TEXT,
   live_since          TEXT,                            -- inizio della sessione online corrente
   live_vehicle_id     INTEGER,                         -- veicolo che sta guidando adesso
   is_active           INTEGER NOT NULL DEFAULT 1,
@@ -386,3 +389,22 @@ CREATE TABLE IF NOT EXISTS app_meta (
   key                 TEXT PRIMARY KEY,
   value               TEXT
 );
+
+-- ------------------------------------------------------------
+--  SEGNALAZIONI DI BUG (dal tasto "Segnala un bug")
+--  Sono salvate anche quando l'invio email non è configurato:
+--  nessuna segnalazione va persa.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS bug_reports (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id             INTEGER,
+  message             TEXT    NOT NULL,
+  contact_email       TEXT,
+  page                TEXT,                              -- schermata da cui è partita
+  app_version         TEXT,
+  user_agent          TEXT,
+  emailed             INTEGER NOT NULL DEFAULT 0,        -- 1 = email consegnata a Resend
+  created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bug_reports_created ON bug_reports(created_at DESC);

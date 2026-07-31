@@ -48,6 +48,14 @@ export const config = {
     clientId: process.env.GOOGLE_CLIENT_ID || '',
   },
 
+  // Invio email (segnalazioni di bug) via API Resend. Senza apiKey l'invio è
+  // disattivato: le segnalazioni restano salvate a database.
+  mail: {
+    apiKey: process.env.RESEND_API_KEY || '',
+    from: process.env.MAIL_FROM || '4 e 2 <onboarding@resend.dev>',
+    bugReportTo: process.env.BUG_REPORT_TO || 'youfusion945@gmail.com',
+  },
+
   // Configurazione mappa esposta al client via /api/config.
   // Di default: tiles raster CARTO dark (gratuiti, nessuna chiave richiesta).
   map: {

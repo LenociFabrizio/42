@@ -10,7 +10,7 @@ import { guard } from '../core/auth.js';
 import { registerPWA } from '../core/pwa.js';
 import { createMap, addMarker, viewportBbox } from '../core/map.js';
 import { $, svg, loader, toast, debounce, esc } from '../core/ui.js';
-import { catIcon } from '../core/constants.js';
+import { catIcon, DRIVE_MODE_ENABLED } from '../core/constants.js';
 import { TrackingSession, bgEnabled } from '../core/tracking.js';
 import api from '../core/api.js';
 
@@ -41,6 +41,9 @@ function bearingBetween(aLat, aLng, bLat, bLng) {
 }
 
 async function main() {
+  // Funzionalità sospesa: chi arriva qui da un link salvato torna alla mappa.
+  if (!DRIVE_MODE_ENABLED) { location.replace('/index.html'); return; }
+
   const user = await guard();
   if (!user) return;
   registerPWA();

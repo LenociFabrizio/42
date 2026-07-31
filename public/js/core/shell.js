@@ -1,12 +1,14 @@
 /* =============================================================
-   shell.js — Struttura comune: top bar (logo, campanella, avatar) e
-   bottom nav "a pollice" con pulsante CREA centrale. Gestisce il
-   badge notifiche (polling leggero) e il foglio di creazione.
+   shell.js — Struttura comune: top bar (logo, impostazioni, amici,
+   campanella, avatar) e bottom nav "a pollice" con pulsante CREA
+   centrale. Gestisce il badge notifiche e gli avvisi "amico online"
+   (stesso polling leggero) e il foglio di creazione.
    ============================================================= */
 import { el, svg, modal } from './ui.js';
 import { auth } from './auth.js';
 import { ringPercent } from './gamification.js';
 import { initConsent } from './consent.js';
+import { initPresence, checkFriendsOnline } from './presence.js';
 import { stampVersion } from './version.js';
 import api from './api.js';
 
@@ -112,11 +114,17 @@ export function mountShell({ active = '', hideNav = false } = {}) {
   initConsent();
   stampVersion();
 
-  // Polling notifiche (leggero): all'avvio e ogni 30s, e al ritorno in foreground.
+  // Polling notifiche (leggero): all'avvio e ogni 30s, e al ritorno in
+  // foreground. Nello stesso giro controlliamo gli amici appena entrati online.
   pollUnread(bellDot);
+  initPresence();
   clearInterval(_pollTimer);
-  _pollTimer = setInterval(() => pollUnread(bellDot), 30000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) pollUnread(bellDot); });
+  _pollTimer = setInterval(() => { pollUnread(bellDot); checkFriendsOnline(); }, 30000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    pollUnread(bellDot);
+    checkFriendsOnline();
+  });
 }
 
 export default mountShell;

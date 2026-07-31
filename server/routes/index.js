@@ -17,6 +17,7 @@ import notificationRoutes from './notifications.js';
 import liveRoutes from './live.js';
 import poiRoutes from './pois.js';
 import settingsRoutes from './settings.js';
+import feedbackRoutes from './feedback.js';
 
 const router = Router();
 
@@ -48,5 +49,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/live', liveRoutes);
 router.use('/pois', poiRoutes);
 router.use('/settings', settingsRoutes);
+router.use('/feedback', feedbackRoutes);
 
 export default router;

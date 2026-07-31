@@ -104,11 +104,11 @@ export function modal({ title = '', content = '', footer = null, center = false,
   return { close, root: modalEl, body };
 }
 
-export function confirmDialog({ title = 'Confermi?', message = '', confirmText = 'Conferma', danger = false } = {}) {
+export function confirmDialog({ title = 'Confermi?', message = '', confirmText = 'Conferma', cancelText = 'Annulla', danger = false } = {}) {
   return new Promise((resolve) => {
     let done = false;
     const btnOk = el('button', { class: `btn ${danger ? 'btn-danger' : 'btn-primary'}`, text: confirmText });
-    const btnNo = el('button', { class: 'btn btn-outline', text: 'Annulla' });
+    const btnNo = el('button', { class: 'btn btn-outline', text: cancelText });
     const m = modal({
       title, center: true,
       content: `<p style="color:var(--text-mid)">${esc(message)}</p>`,

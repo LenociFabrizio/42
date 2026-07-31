@@ -79,7 +79,7 @@ public/
 - **Record**: il **record ufficiale appartiene sempre al creatore** del percorso; ogni altro utente conserva il **miglior tempo personale** e può scalare la classifica dei tempi, ma non sostituisce il record principale (chi batte il tempo del creatore lo "sfida" con una notifica).
 - **Evento**: data/ora, durata, max partecipanti, percorso associato, **area + raggio**; la presenza si conferma con **check-in GPS** verificato lato server.
 - **Club**: nome univoco, privacy, membri/ruoli (creatore/moderatore/membro), livello/XP, classifiche.
-- **Amicizie**: richiesta / accetta / rifiuta, stato online.
+- **Amicizie**: richiesta / accetta / rifiuta, presenza (online adesso oppure "offline da…", da `users.last_active` aggiornato a ogni richiesta autenticata) e avviso con suono quando un amico entra nell'app.
 - **Gamification**: XP da attività reale, curva livelli, badge, missioni (giornaliere/settimanali/obiettivi), streak. **Mai pay-to-win.**
 - **Live Map** multiplayer: opt-in, visibile secondo privacy, sbloccata dal **livello 5**.
 
@@ -89,6 +89,26 @@ Dettagli sicurezza in [`SECURITY.md`](./SECURITY.md).
 
 ## API (panoramica)
 
-`/api/auth` · `/api/users` · `/api/routes` · `/api/events` · `/api/clubs` · `/api/friends` · `/api/gamification` · `/api/notifications` · `/api/live` · `/api/pois` · `/api/settings` · `/api/config` · `/api/health`
+`/api/auth` · `/api/users` · `/api/routes` · `/api/events` · `/api/clubs` · `/api/friends` · `/api/gamification` · `/api/notifications` · `/api/live` · `/api/pois` · `/api/settings` · `/api/feedback` · `/api/config` · `/api/health`
 
 Tutte le rotte protette usano `Authorization: Bearer <jwt>`. Le risposte d'errore hanno forma `{ "error": "messaggio" }`.
+
+---
+
+## Segnalazioni di bug (email)
+
+Impostazioni → **Assistenza → Segnala un bug**: il messaggio viene salvato in
+`bug_reports` e inviato per email, **senza aprire un client di posta**.
+
+L'invio usa l'API HTTP di [Resend](https://resend.com) (piano gratuito, nessuna
+dipendenza SMTP). Nel `.env`:
+
+```
+RESEND_API_KEY=re_...                       # se manca, l'invio è disattivato
+MAIL_FROM=4 e 2 <onboarding@resend.dev>     # mittente verificato su Resend
+BUG_REPORT_TO=youfusion945@gmail.com        # destinatario delle segnalazioni
+```
+
+Senza `RESEND_API_KEY` nulla va perso: la segnalazione resta a database e il
+client risponde "registrata" invece di "inviata". In produzione va aggiunta
+anche tra le Environment Variables dell'hosting.
