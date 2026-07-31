@@ -33,10 +33,18 @@ function injectStyle() {
   .cropper-stage {
     position:relative; width:${VIEWPORT}px; height:${VIEWPORT}px; margin:0 auto;
     border-radius:50%; overflow:hidden; background:var(--bg-000); cursor:grab;
+    touch-action:none;
     box-shadow:0 0 0 3px var(--accent), 0 0 24px var(--accent-glow);
   }
   .cropper-stage.dragging { cursor:grabbing; }
-  .cropper-stage img { position:absolute; top:0; left:0; transform-origin:0 0; pointer-events:none; will-change:transform; }
+  /* max-width/height a "none": base.css impone img{max-width:100%} e dentro una
+     cornice di ${VIEWPORT}px teneva la larghezza inchiodata mentre l'altezza
+     cresceva con lo zoom — la foto si stirava invece di ingrandirsi.
+     touch-action anche qui: la gesture nasce sull'immagine e .modal-body scrolla. */
+  .cropper-stage img {
+    position:absolute; top:0; left:0; max-width:none; max-height:none;
+    transform-origin:0 0; pointer-events:none; will-change:transform; touch-action:none;
+  }
   .cropper-controls { display:flex; align-items:center; gap:10px; margin:20px auto 4px; max-width:${VIEWPORT}px; color:var(--text-lo); }
   .cropper-controls input[type=range] { flex:1; accent-color:var(--accent); }
   .cropper-hint { text-align:center; font-size:.8rem; color:var(--text-lo); margin-top:10px; }
@@ -121,7 +129,7 @@ export async function cropAvatar(file, opts = {}) {
     }
     center(); paint();
 
-    /** Zoom tenendo fermo un punto della cornice (il centro, o le due dita). */
+    /** Zoom col cursore o la rotella: tiene fermo il centro della cornice. */
     function setScale(next, anchorX = VIEWPORT / 2, anchorY = VIEWPORT / 2) {
       const clamped = Math.min(MAX_ZOOM, Math.max(1, next));
       if (clamped === scale) return;
@@ -142,7 +150,12 @@ export async function cropAvatar(file, opts = {}) {
     // --- Trascinamento e pizzico (Pointer Events: mouse, penna e dita) ---
     const pts = new Map();      // puntatori attivi
     let startX = 0, startY = 0, startPosX = 0, startPosY = 0;
+    // Stato del pizzico, fotografato quando il secondo dito appoggia: distanza,
+    // zoom, punto di mezzo e posizione dell'immagine. Restano FERMI per tutto il
+    // gesto — se si ricalcolassero a ogni movimento l'ancora scapperebbe con le
+    // dita e l'immagine strisciava di traverso invece di ingrandirsi.
     let pinchDist = 0, pinchScale = 1;
+    let pinchMidX = 0, pinchMidY = 0, pinchPosX = 0, pinchPosY = 0;
 
     const rect = () => stage.getBoundingClientRect();
     const dist = ([a, b]) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -150,6 +163,28 @@ export async function cropAvatar(file, opts = {}) {
       const r = rect();
       return [(a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top];
     };
+    const twoPts = () => [...pts.values()].slice(0, 2);
+
+    function beginPinch() {
+      const two = twoPts();
+      pinchDist = dist(two);
+      pinchScale = scale;
+      [pinchMidX, pinchMidY] = mid(two);
+      pinchPosX = posX; pinchPosY = posY;
+    }
+
+    /** Pizzico: zoom sul punto di partenza tra le dita + spostamento del gesto. */
+    function applyPinch() {
+      if (pinchDist <= 0) return;
+      const two = twoPts();
+      const k = Math.min(MAX_ZOOM, Math.max(1, pinchScale * (dist(two) / pinchDist))) / pinchScale;
+      const [mx, my] = mid(two);
+      posX = pinchMidX - (pinchMidX - pinchPosX) * k + (mx - pinchMidX);
+      posY = pinchMidY - (pinchMidY - pinchPosY) * k + (my - pinchMidY);
+      scale = pinchScale * k;
+      range.value = String(scale);
+      clamp(); paint();
+    }
 
     stage.addEventListener('pointerdown', (e) => {
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -158,19 +193,13 @@ export async function cropAvatar(file, opts = {}) {
       if (pts.size === 1) {
         startX = e.clientX; startY = e.clientY; startPosX = posX; startPosY = posY;
       } else if (pts.size === 2) {
-        pinchDist = dist([...pts.values()]);
-        pinchScale = scale;
+        beginPinch();
       }
     });
     stage.addEventListener('pointermove', (e) => {
       if (!pts.has(e.pointerId)) return;
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pts.size >= 2) {
-        const two = [...pts.values()].slice(0, 2);
-        const d = dist(two);
-        if (pinchDist > 0) setScale(pinchScale * (d / pinchDist), ...mid(two));
-        return;
-      }
+      if (pts.size >= 2) { applyPinch(); return; }
       posX = startPosX + (e.clientX - startX);
       posY = startPosY + (e.clientY - startY);
       clamp(); paint();
@@ -182,6 +211,9 @@ export async function cropAvatar(file, opts = {}) {
       if (pts.size === 1) {
         const p = [...pts.values()][0];
         startX = p.x; startY = p.y; startPosX = posX; startPosY = posY;
+        pinchDist = 0;
+      } else if (pts.size >= 2) {
+        beginPinch(); // erano tre dita: il pizzico ricomincia dalle due che restano
       }
     };
     stage.addEventListener('pointerup', lift);

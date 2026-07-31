@@ -606,11 +606,6 @@
 .btn-logout { color: var(--danger); border-color: var(--danger); background: transparent; }
 .btn-logout:hover { background: rgba(255, 59, 48, 0.12); color: var(--danger); }
 
-/* Bottoni di navigazione nel profilo (Impostazioni / Amici / Club). */
-.profile-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
-.profile-nav .btn { flex-direction: column; gap: 6px; min-height: 68px; padding: 10px 6px; font-size: 0.82rem; }
-.profile-nav .btn svg { width: 22px; height: 22px; }
-
 /* Coppia di bottoni affiancati (es. "Modifica profilo" / "Password").
    .btn ha white-space:nowrap: in una cella stretta l'etichetta lunga
    uscirebbe dal bottone e la coppia risulterebbe disallineata. Qui le

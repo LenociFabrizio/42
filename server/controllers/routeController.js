@@ -226,14 +226,18 @@ export const remove = asyncHandler(async (req, res) => {
   res.status(204).end();
 });
 
-/** POST /api/routes/:id/complete — invia un completamento cronometrato. */
+/**
+ * POST /api/routes/:id/complete — invia un completamento cronometrato.
+ * Il tracciato è OBBLIGATORIO: è l'unica prova che il giro è stato guidato
+ * davvero, dalla partenza all'arrivo (la verifica è in submitCompletion).
+ */
 export const complete = asyncHandler(async (req, res) => {
   const id = v.int(req.params.id, 'id', { min: 1 });
   const data = {
     time_ms: v.int(req.body.time_ms, 'Tempo', { min: 1, max: 100 * 3600 * 1000 }),
     weather: v.optStr(req.body.weather, 'Meteo', { max: 40 }),
     vehicle_id: req.body.vehicle_id ? v.int(req.body.vehicle_id, 'Veicolo', { min: 1 }) : null,
-    track: Array.isArray(req.body.track) ? v.track(req.body.track, 'Tracciato', { minPoints: 2 }) : null,
+    track: v.track(req.body.track, 'Tracciato', { minPoints: 2 }),
   };
   const result = await submitCompletion(id, req.user.id, data);
   res.status(201).json(result);

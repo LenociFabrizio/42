@@ -38,6 +38,12 @@ export const ROUTE_VEHICLE_TYPES = [
    percorso non è salvabile: evita "percorsi" di pochi metri senza senso. */
 export const MIN_ROUTE_DISTANCE_M = 2000;
 
+/* Tentativo cronometrato su un percorso esistente: si parte solo dalla partenza
+   e il cronometro si ferma da sé all'arrivo. Allineate alle omonime in
+   server/utils/constants.js, che è chi fa davvero rispettare la regola. */
+export const ATTEMPT_GATE_RADIUS_M = 100;   // raggio dei cancelletti (metri)
+export const ATTEMPT_MIN_COVERAGE = 0.7;    // quanto percorso serve prima dell'arrivo
+
 /* Raggio di visibilità iniziale della mappa (km): quanto "vicino" si apre.
    Modificabile in Impostazioni; il default è una vista ravvicinata. */
 export const MAP_RADIUS_OPTIONS = [

@@ -1,6 +1,6 @@
 {
   "name": "quattro-e-due",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "description": "4 & | 2 — community per chi ama i viaggi su 4 e/o 2 ruote: percorsi, record, eventi, club, live map.",
   "type": "module",
   "main": "server/index.js",

@@ -1,5 +1,5 @@
 /* =============================================================
-   leaderboard.js — Classifiche globali: piloti (per XP) e club.
+   leaderboard.js — Classifiche globali: piloti (per XP) e club (per km).
    ============================================================= */
 import '../core/theme.js';
 import { guard, auth } from '../core/auth.js';
@@ -71,9 +71,10 @@ async function renderClubs(box) {
       el('div', { class: `li-rank ${rankClass(c.rank)}`, text: c.rank }),
       el('div', { class: 'li-body' }, [
         el('div', { class: 'li-title', text: c.name }),
-        el('div', { class: 'li-sub', text: `Liv. ${c.level} · ${c.members_count} membri · ${fmtDistance(c.total_distance_m)}` }),
+        el('div', { class: 'li-sub', text: `${c.members_count} membri` }),
       ]),
-      el('div', { class: 'num text-accent', text: `${c.xp} XP` }),
+      // Il club non ha punti: in classifica vanno i chilometri dei suoi membri.
+      el('div', { class: 'num text-accent', text: fmtDistance(c.total_distance_m || 0) }),
     ]));
   }
   box.append(leaderboard.length ? list : el('div', { class: 'empty', text: 'Nessun club in classifica.' }));

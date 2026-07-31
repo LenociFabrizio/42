@@ -164,6 +164,23 @@ async function runMigrations() {
     await db.run('ALTER TABLE users ADD COLUMN region TEXT');
   }
 
+  // Club senza punti: xp/level erano nati con il club e non crescevano mai
+  // (nessuna query li ha mai aggiornati), quindi mostravano "0 XP · Liv. 1" a
+  // tutti. Colonne via, e l'indice sostituito con quello sui chilometri, che è
+  // l'ordinamento vero della classifica. Sotto try: se il motore non supporta
+  // DROP COLUMN restano lì, inerti — nessuno le legge più.
+  const clubCols = await db.all('PRAGMA table_info(clubs)');
+  if (clubCols.length && clubCols.some((c) => c.name === 'xp')) {
+    try {
+      await db.run('DROP INDEX IF EXISTS idx_clubs_xp');
+      await db.run('ALTER TABLE clubs DROP COLUMN xp');
+      await db.run('ALTER TABLE clubs DROP COLUMN level');
+    } catch (err) {
+      console.warn('[db] colonne xp/level dei club non rimosse:', err.message);
+    }
+  }
+  await db.run('CREATE INDEX IF NOT EXISTS idx_clubs_distance ON clubs(total_distance_m DESC)');
+
   // Preferenze di navigazione (evita pedaggi, autostrade, ZTL, traghetti).
   const setCols = await db.all('PRAGMA table_info(user_settings)');
   const NAV_COLS = [

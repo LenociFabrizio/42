@@ -14,8 +14,8 @@
  */
 import db from '../database/db.js';
 import { HttpError } from '../utils/helpers.js';
-import { XP, MIN_ROUTE_DISTANCE_M } from '../utils/constants.js';
-import { trackMetrics, simplify, encodePolyline, bbox } from '../utils/geo.js';
+import { XP, MIN_ROUTE_DISTANCE_M, ATTEMPT_GATE_RADIUS_M, ATTEMPT_MIN_COVERAGE } from '../utils/constants.js';
+import { trackMetrics, simplify, encodePolyline, bbox, haversine } from '../utils/geo.js';
 import { awardXp, bumpMissions, checkBadges } from './gamification.js';
 import { recomputeUserStats } from './stats.js';
 import { regionCodeAt } from './areaAccess.js';
@@ -105,33 +105,62 @@ export async function createRoute(userId, input) {
 }
 
 /**
+ * Il tentativo passa dal cancelletto? Guarda i primi (o gli ultimi) campioni e
+ * non solo l'estremo: il primo fix di una registrazione può essere ancora
+ * impreciso, e l'ultimo può cadere qualche metro oltre il traguardo.
+ */
+function gatePassed(points, lat, lng) {
+  return points.some((p) => haversine(p.lat, p.lng, lat, lng) <= ATTEMPT_GATE_RADIUS_M);
+}
+
+/**
  * Registra un completamento cronometrato e applica la logica record/PB.
+ *
+ * Un tempo vale solo se è un GIRO VERO: il tracciato deve partire dalla
+ * partenza del percorso, coprirlo quasi tutto e chiudersi sull'arrivo. Il
+ * client lo impone già (non lascia avviare lontano dallo start e ferma il
+ * cronometro da sé sul traguardo), ma la regola la fa rispettare qui: senza
+ * questa verifica basterebbe una chiamata all'API per inventarsi un record.
+ *
  * @param {number} routeId
  * @param {number} userId
- * @param {object} data  { time_ms, track?, weather?, vehicle_id? }
+ * @param {object} data  { time_ms, track, weather?, vehicle_id? }
  * @returns {object} riepilogo { completion, is_personal_best, new_official_record, beat_official, xp }
  */
 export async function submitCompletion(routeId, userId, data) {
   const route = await db.prepare('SELECT * FROM routes WHERE id = ?').get(routeId);
   if (!route) throw new HttpError(404, 'Percorso non trovato.');
 
-  // Metriche dal tracciato registrato (se presente), altrimenti dai dati route.
-  let distance = route.distance_m;
-  let avgSpeed = 0;
-  let maxSpeed = 0;
-  let polyline = '';
-  let timeMs = Math.round(Number(data.time_ms) || 0);
-
-  if (Array.isArray(data.track) && data.track.length >= 2) {
-    const m = trackMetrics(data.track);
-    distance = m.distance_m || distance;
-    maxSpeed = m.max_speed_kmh;
-    if (!timeMs && m.moving_time_s) timeMs = m.moving_time_s * 1000;
-    polyline = encodePolyline(simplify(data.track));
+  const track = Array.isArray(data.track) ? data.track : [];
+  if (track.length < 2) {
+    throw new HttpError(400, 'Serve il tracciato GPS del giro: il tempo si registra guidando il percorso.');
   }
+  if (!gatePassed(track.slice(0, 5), route.start_lat, route.start_lng)) {
+    throw new HttpError(400, `Il giro non parte dalla partenza del percorso (serve essere entro ${ATTEMPT_GATE_RADIUS_M} m dallo start).`);
+  }
+  if (!gatePassed(track.slice(-5), route.end_lat, route.end_lng)) {
+    throw new HttpError(400, 'Il giro non si chiude sull\'arrivo del percorso: il tempo vale solo fino al traguardo.');
+  }
+
+  const m = trackMetrics(track);
+  const minCoverage = Math.round((route.distance_m || 0) * ATTEMPT_MIN_COVERAGE);
+  if (m.distance_m < minCoverage) {
+    throw new HttpError(400, 'Il percorso non è stato completato: il tracciato è troppo corto rispetto al tracciato originale.');
+  }
+
+  // Il cronometro lo detta il TRACCIATO, non il client: se i campioni hanno i
+  // timestamp il tempo è la loro durata (primo → ultimo). `time_ms` resta solo
+  // come ripiego per le tracce senza orari.
+  const spanMs = Number(track[track.length - 1].t) - Number(track[0].t);
+  let timeMs = Number.isFinite(spanMs) && spanMs > 0
+    ? Math.round(spanMs)
+    : Math.round(Number(data.time_ms) || 0);
   if (timeMs <= 0) throw new HttpError(400, 'Tempo del completamento non valido.');
-  avgSpeed = distance > 0 ? Math.round((distance / (timeMs / 1000)) * 3.6 * 10) / 10 : 0;
-  if (!maxSpeed) maxSpeed = avgSpeed;
+
+  const distance = m.distance_m || route.distance_m;
+  const polyline = encodePolyline(simplify(track));
+  const avgSpeed = distance > 0 ? Math.round((distance / (timeMs / 1000)) * 3.6 * 10) / 10 : 0;
+  const maxSpeed = m.max_speed_kmh || avgSpeed;
 
   // Miglior tempo personale attuale dell'utente su questo percorso.
   const prevPb = await db

@@ -77,19 +77,16 @@ function header(club, myRole) {
       logo,
       el('div', { style: 'min-width:0;flex:1' }, [
         el('h1', { class: 'truncate', text: club.name, style: 'font-size:1.5rem' }),
-        el('div', { class: 'flex gap-2 wrap mt-1' }, [
-          el('span', { class: 'pill accent', text: `Liv. ${club.level || 1}` }),
-          privacy,
-        ]),
+        el('div', { class: 'flex gap-2 wrap mt-1' }, [privacy]),
         canEdit ? el('div', { class: 'text-lo mt-1', style: 'font-size:.76rem', text: 'Tocca l\'immagine per cambiarla' }) : null,
       ]),
     ]),
     club.description ? el('p', { class: 'text-mid mt-3', text: club.description }) : null,
+    // Niente livello né XP del club: i punti sono una cosa di chi guida, non del
+    // gruppo. Un club si misura con i membri e con i chilometri che macinano.
     el('div', { class: 'stats-row mt-3' }, [
       stat(fmtNum(club.members_count || 0), 'Membri'),
-      stat(`${club.level || 1}`, 'Livello'),
       stat(fmtDistance(club.total_distance_m || 0), 'Distanza'),
-      stat(fmtNum(club.xp || 0), 'XP'),
     ]),
   ]);
 }

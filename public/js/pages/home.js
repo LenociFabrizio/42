@@ -253,15 +253,17 @@ async function pushPositionNow() {
  * L'inquadratura usa il raggio di visibilità scelto in Impostazioni
  * (default: vista ravvicinata), non uno zoom fisso.
  */
-async function locate(fly = true, opts) {
+async function locate(fly = true, opts, { quiet = false } = {}) {
   try {
     const pos = await getCurrentPosition(opts);
     showMe(pos.lat, pos.lng);
     // Col tasto si inquadra sempre; all'avvio no, se il GPS ci ha già pensato.
     if (fly || !centered) fitRadius(map, pos.lat, pos.lng, mapRadiusKm, { animate: fly });
     centered = true;
+    return true;
   } catch {
-    if (fly) toast.warning('Posizione non disponibile. Controlla i permessi GPS.');
+    if (fly && !quiet) toast.warning('Posizione non disponibile. Controlla i permessi GPS.');
+    return false;
   }
 }
 
@@ -312,15 +314,19 @@ function updateHeading(lat, lng, coords) {
 }
 
 /**
- * Inquadratura di partenza: la mappa deve aprirsi SEMPRE su di te, senza
- * dover toccare il tasto "la mia posizione".
+ * Inquadratura di partenza: aprendo la mappa si deve vedere SUBITO dove si è,
+ * senza toccare il tasto "la mia posizione".
  * 1) l'ultima posizione nota dà subito la vista giusta (nessuna attesa);
  * 2) senza nulla in memoria si inquadra la propria AREA di partenza, invece di
  *    mostrare l'Italia intera;
- * 3) in parallelo si chiede al GPS il punto reale, con parametri "morbidi"
- *    (accetta una posizione recente: è molto più rapida del fix preciso);
- * 4) se il permesso arriva tardi o il primo tentativo scade, ci pensa il
- *    primo aggiornamento di startWatch() (vedi `centered`).
+ * 3) poi si fa esattamente quello che fa il tasto: fix ad alta precisione e
+ *    volo sulla posizione reale. Il primo tentativo è silenzioso, perché al
+ *    primo avvio il permesso può arrivare con qualche secondo di ritardo;
+ * 4) se scade, si ritenta accettando un fix meno preciso (rete, posizione
+ *    recente) prima di dire che la posizione non c'è: era il punto debole di
+ *    prima, un solo tentativo "morbido" che sui telefoni con la sola
+ *    localizzazione GPS falliva in silenzio;
+ * 5) ultima rete di sicurezza: il primo aggiornamento di startWatch() (`centered`).
  */
 async function centerOnMe() {
   let framed = false;
@@ -337,7 +343,8 @@ async function centerOnMe() {
     const home = homeGeoName();
     if (home) fitRegion(map, home);
   }
-  await locate(false, { enableHighAccuracy: false, timeout: 20000, maximumAge: 120000 });
+  if (await locate(true, { enableHighAccuracy: true, timeout: 15000 }, { quiet: true })) return;
+  await locate(true, { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
 }
 
 /** Svela le aree scoperte e lascia in ombra quelle ancora da conquistare. */
@@ -993,7 +1000,7 @@ function openCheckinSheet(ev, d) {
 
 function openAttemptSheet(rt, d) {
   const body = el('div', {}, [
-    el('p', { class: 'text-mid mb-3', text: `Sei a ${fmtDistance(d)} dalla partenza. Registrando il giro il tuo tempo entra nella classifica del percorso.` }),
+    el('p', { class: 'text-mid mb-3', text: `Sei a ${fmtDistance(d)} dalla partenza. Il cronometro parte solo dalla linea di partenza e si ferma da sé all'arrivo: il tempo entra in classifica.` }),
     el('a', { class: 'btn btn-primary btn-block', href: `/record.html?route=${rt.id}`, html: `${svg('play', 20)} Registra un tentativo` }),
     el('a', { class: 'btn btn-outline btn-block', style: 'margin-top:var(--sp-2)', href: `/route.html?id=${rt.id}`, text: 'Apri percorso' }),
   ]);

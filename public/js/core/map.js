@@ -84,7 +84,10 @@ export async function createMap(container, { center = [12.5, 42.5], zoom = 5.2 }
     dragRotate: false,
     pitchWithRotate: false,
   });
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+  // Niente controlli +/- : in alto a destra finivano sotto la barra superiore
+  // (e in basso avrebbero rubato spazio al pollice e ai tasti della mappa). Lo
+  // zoom si fa col pizzico, col doppio tocco, con la rotella o coi tasti +/−:
+  // su un'app mobile-first due bottoni in meno sono schermo guadagnato.
   map.touchZoomRotate.disableRotation();
   // Confini delle regioni italiane, coerenti col tema (ambra tenue).
   map.on('load', () => addRegionBorders(map));

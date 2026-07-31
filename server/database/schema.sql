@@ -255,15 +255,16 @@ CREATE TABLE IF NOT EXISTS clubs (
   creator_id          INTEGER NOT NULL,
   max_members         INTEGER NOT NULL DEFAULT 0,      -- 0 = illimitato
   privacy             TEXT    NOT NULL DEFAULT 'public', -- 'public' | 'private'
-  xp                  INTEGER NOT NULL DEFAULT 0,
-  level               INTEGER NOT NULL DEFAULT 1,
+  -- Niente xp/level: i punti sono di chi guida, non del gruppo. Un club si
+  -- misura con i membri e i loro chilometri (le colonne vecchie le toglie
+  -- runMigrations() in db.js).
   -- Statistiche cache
   members_count       INTEGER NOT NULL DEFAULT 1,
   total_distance_m    INTEGER NOT NULL DEFAULT 0,
   created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_clubs_xp ON clubs(xp DESC);
+CREATE INDEX IF NOT EXISTS idx_clubs_distance ON clubs(total_distance_m DESC);
 
 CREATE TABLE IF NOT EXISTS club_members (
   club_id             INTEGER NOT NULL,

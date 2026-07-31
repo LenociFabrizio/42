@@ -16,7 +16,7 @@ import { recomputeClubStats } from '../services/stats.js';
 import { persistUpload, deleteUpload } from '../middleware/upload.js';
 
 /** Colonne "card" di un club per liste e classifiche. */
-const CARD_COLS = 'id, name, photo, description, privacy, level, xp, members_count, total_distance_m';
+const CARD_COLS = 'id, name, photo, description, privacy, members_count, total_distance_m';
 
 /* -------------------- HELPER INTERNI -------------------- */
 
@@ -49,7 +49,7 @@ async function getClubOr404(id) {
 
 /**
  * GET /api/clubs — lista/ricerca club.
- * Query: q (nome/descrizione LIKE), sort (xp|distance|members, def xp).
+ * Query: q (nome/descrizione LIKE), sort (distance|members, def distance).
  * Se autenticato, ogni club riporta is_member.
  */
 export const list = asyncHandler(async (req, res) => {
@@ -68,9 +68,12 @@ export const list = asyncHandler(async (req, res) => {
     args.push(`%${q}%`, `%${q}%`);
   }
 
-  const sort = v.oneOf(req.query.sort, ['xp', 'distance', 'members'], 'Ordinamento', { def: 'xp' });
-  const orderBy =
-    sort === 'distance' ? 'total_distance_m DESC' : sort === 'members' ? 'members_count DESC' : 'xp DESC';
+  // I club non hanno punti: si ordinano per chilometri o per numero di membri.
+  // 'xp' lo chiedono ancora le app rimaste in cache: vale come 'distance',
+  // meglio della lista vuota con un 400.
+  const rawSort = req.query.sort === 'xp' ? 'distance' : req.query.sort;
+  const sort = v.oneOf(rawSort, ['distance', 'members'], 'Ordinamento', { def: 'distance' });
+  const orderBy = sort === 'members' ? 'members_count DESC' : 'total_distance_m DESC';
   sql += ` ORDER BY ${orderBy}, id ASC LIMIT ?`;
   args.push(100);
 
@@ -78,10 +81,10 @@ export const list = asyncHandler(async (req, res) => {
   res.json({ clubs: rows.map((c) => ({ ...c, is_member: !!c.is_member })) });
 });
 
-/** GET /api/clubs/leaderboard — top club per XP (poi distanza). */
+/** GET /api/clubs/leaderboard — top club per distanza dei membri (poi membri). */
 export const leaderboard = asyncHandler(async (_req, res) => {
   const rows = await db
-    .prepare(`SELECT ${CARD_COLS} FROM clubs ORDER BY xp DESC, total_distance_m DESC, id ASC LIMIT 50`)
+    .prepare(`SELECT ${CARD_COLS} FROM clubs ORDER BY total_distance_m DESC, members_count DESC, id ASC LIMIT 50`)
     .all();
   res.json({ leaderboard: rows.map((c, i) => ({ ...c, rank: i + 1 })) });
 });
@@ -101,8 +104,8 @@ export const create = asyncHandler(async (req, res) => {
 
   const info = await db
     .prepare(
-      `INSERT INTO clubs (name, photo, description, creator_id, max_members, privacy, xp, level, members_count)
-       VALUES (?, ?, ?, ?, ?, ?, 0, 1, 1)`
+      `INSERT INTO clubs (name, photo, description, creator_id, max_members, privacy, members_count)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`
     )
     .run(name, photo, description, req.user.id, maxMembers, privacy);
   const id = info.lastInsertRowid;

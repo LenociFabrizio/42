@@ -16,6 +16,7 @@ Sintesi delle misure implementate. Principio guida: **mai fidarsi del client**.
 ## Validazione input
 - Ogni endpoint valida e normalizza i dati con `server/utils/validate.js` (stringhe con min/max, email, nickname whitelist `[a-zA-Z0-9._-]`, interi/float con range, coordinate lat/lng, enum `oneOf`, date ISO, tracce GPS con limite di punti). Errori → `400` con messaggio chiaro.
 - Le tracce GPS sono limitate nel numero di punti (anti-abuso) e semplificate/filtrate lato server.
+- **Tempi in classifica**: `POST /routes/:id/complete` accetta un tentativo solo con il **tracciato** allegato e lo verifica sul percorso vero — primi punti entro `ATTEMPT_GATE_RADIUS_M` (100 m) dalla partenza, ultimi punti sul traguardo, almeno il **70 %** della distanza coperto. Il tempo è ricalcolato dai **timestamp dei punti GPS**, non da `time_ms` inviato dal client: la app blocca l'avvio fuori dalla partenza e ferma il cronometro da sé all'arrivo, ma la regola la fa rispettare il server.
 
 ## Anti-injection / XSS / CSRF
 - **SQL injection**: tutte le query usano statement **parametrizzati** (`?`), mai concatenazione di input.

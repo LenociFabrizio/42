@@ -11,14 +11,15 @@ import { $, el, svg, loader, toast, fmtDistance, fmtNum, debounce, qs } from '..
 import { clubLogo } from '../core/club-logo.js';
 import api from '../core/api.js';
 
+// Niente ordinamento per XP: un club non ha punti né livelli, conta quanta
+// strada fanno i suoi membri.
 const SORTS = [
-  { v: 'xp', l: 'XP' },
   { v: 'distance', l: 'Distanza' },
   { v: 'members', l: 'Membri' },
 ];
 
 let tab = qs.get('tab') || 'esplora';
-let sort = 'xp';
+let sort = 'distance';
 let query = '';
 let root;
 
@@ -107,7 +108,7 @@ function clubCard(cl) {
   }
   const body = el('div', { class: 'body' }, [
     el('h3', { class: 'truncate', text: cl.name }),
-    el('div', { class: 'li-sub mt-1', text: `${fmtNum(cl.members_count || 0)} membri · Liv. ${cl.level || 1}` }),
+    el('div', { class: 'li-sub mt-1', text: `${fmtNum(cl.members_count || 0)} membri` }),
     el('div', { class: 'text-accent mono mt-1', style: 'font-size:.85rem;font-weight:600', text: fmtDistance(cl.total_distance_m || 0) }),
   ]);
   return el('a', { class: 'tile', href: `/club.html?id=${cl.id}` }, [cover, body]);
@@ -122,7 +123,10 @@ async function renderClassifica(c) {
     if (!leaderboard || !leaderboard.length) { c.append(emptyState('🏆', 'Classifica vuota', 'Nessun club in classifica.')); return; }
     const list = el('div', { class: 'list' });
     for (const cl of leaderboard) list.append(lbRow(cl));
-    c.append(list);
+    c.append(
+      el('p', { class: 'text-lo mb-3', style: 'font-size:.82rem', text: 'Club ordinati per chilometri percorsi dai loro membri.' }),
+      list,
+    );
   } catch (err) {
     c.innerHTML = '';
     c.append(emptyState('⚠️', 'Errore', err.message || 'Impossibile caricare la classifica.'));
@@ -135,7 +139,7 @@ function lbRow(cl) {
     clubLogo(cl, { size: 38 }),
     el('div', { class: 'li-body' }, [
       el('div', { class: 'li-title truncate', text: cl.name }),
-      el('div', { class: 'li-sub', text: `${fmtNum(cl.xp || 0)} XP · ${fmtDistance(cl.total_distance_m || 0)}` }),
+      el('div', { class: 'li-sub', text: `${fmtDistance(cl.total_distance_m || 0)} · ${fmtNum(cl.members_count || 0)} membri` }),
     ]),
     el('span', { class: 'chev', html: svg('chevron', 20) }),
   ]);

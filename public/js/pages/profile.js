@@ -216,11 +216,8 @@ function actionsCard() {
       el('button', { class: 'btn btn-outline', html: `${svg('edit', 20)}<span>Modifica profilo</span>`, onClick: () => openEditModal() }),
       el('button', { class: 'btn btn-outline', html: `${svg('key', 20)}<span>Password</span>`, onClick: openPasswordModal }),
     ]),
-    el('div', { class: 'profile-nav', style: 'margin-top:var(--sp-3)' }, [
-      el('a', { class: 'btn btn-outline', href: '/settings.html', html: `${svg('settings', 22)}<span>Impostazioni</span>` }),
-      el('a', { class: 'btn btn-outline', href: '/friends.html', html: `${svg('users', 22)}<span>Amici</span>` }),
-      el('a', { class: 'btn btn-outline', href: '/clubs.html', html: `${svg('building', 22)}<span>Club</span>` }),
-    ]),
+    // Niente scorciatoie a Impostazioni/Amici/Club: sono già nella barra in alto
+    // a destra e nel menu in basso. Ripeterle qui era solo rumore.
     el('div', { style: 'margin-top:var(--sp-3)' }, [
       el('button', { class: 'btn btn-logout btn-block', html: `${svg('logout', 20)} Esci`, onClick: () => auth.logout() }),
     ]),

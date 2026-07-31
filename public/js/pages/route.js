@@ -117,7 +117,8 @@ function render(data) {
         <div class="text-lo mt-1" style="font-size:.8rem">${fmtSpeed(myBest.avg_speed_kmh)} media · ${fmtDate(myBest.created_at)}</div>
       </div>` : `<div class="mb-4"></div>`}
 
-    <a class="btn btn-primary btn-block btn-lg mb-3" href="/record.html?route=${id}">${svg('play', 22)} Registra il tuo tempo</a>
+    <a class="btn btn-primary btn-block btn-lg" href="/record.html?route=${id}">${svg('play', 22)} Registra il tuo tempo</a>
+    <p class="text-lo mb-3 mt-1" style="font-size:.8rem">Il cronometro parte solo dalla linea di partenza e si ferma da sé al traguardo.</p>
 
     <div class="flex gap-2 mb-3">
       <button class="btn btn-outline grow" id="like-btn"></button>

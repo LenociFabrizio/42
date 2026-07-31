@@ -54,6 +54,23 @@ export const LIVE_STALE_SECONDS = 180;
 // MIN_ROUTE_DISTANCE_M in public/js/core/constants.js.
 export const MIN_ROUTE_DISTANCE_M = 2000;
 
+/* --- Tentativo cronometrato su un percorso esistente ---
+   Un tempo entra in classifica solo se è un giro VERO: si parte dalla partenza
+   del percorso e il cronometro si chiude all'arrivo. Il client blocca l'avvio
+   fuori dal raggio e ferma il tempo da sé sul traguardo, ma la regola la fa
+   rispettare il server (mai fidarsi del client).
+   Devono restare allineate a public/js/core/constants.js. */
+
+// Raggio dei "cancelletti" di partenza e arrivo (metri). Largo quanto basta per
+// il margine d'errore del GPS (i campioni oltre 40 m di accuratezza sono già
+// scartati), non tanto da poter tagliare il percorso.
+export const ATTEMPT_GATE_RADIUS_M = 100;
+
+// Frazione della lunghezza del percorso da coprire davvero prima che l'arrivo
+// possa chiudere il tempo. Serve soprattutto agli anelli, dove partenza e
+// arrivo coincidono: senza questa soglia basterebbe restare fermi allo start.
+export const ATTEMPT_MIN_COVERAGE = 0.7;
+
 // Ricompense XP di base per ogni azione (il "cuore" della gamification).
 // Mai pay-to-win: solo attività reale genera XP.
 export const XP = {

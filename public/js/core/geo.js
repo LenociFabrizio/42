@@ -27,6 +27,25 @@ export function bearing(aLat, aLng, bLat, bLng) {
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
+/**
+ * Distanza in metri dal punto P al segmento A→B. Alla scala di un percorso la
+ * curvatura terrestre è trascurabile: i gradi si proiettano in metri locali e il
+ * problema si risolve in piano.
+ *
+ * Serve a riconoscere il TAGLIO DEL TRAGUARDO anche in velocità: fra due
+ * campioni GPS a 100 km/h si percorrono decine di metri, e controllando solo i
+ * punti si potrebbe attraversare l'arrivo senza risultarci mai dentro.
+ */
+export function distanceToSegment(pLat, pLng, aLat, aLng, bLat, bLng) {
+  const mLat = 111320;
+  const mLng = 111320 * Math.cos(toRad((aLat + bLat) / 2));
+  const bx = (bLng - aLng) * mLng, by = (bLat - aLat) * mLat;   // B rispetto ad A
+  const px = (pLng - aLng) * mLng, py = (pLat - aLat) * mLat;   // P rispetto ad A
+  const len2 = bx * bx + by * by;
+  const t = len2 > 0 ? Math.max(0, Math.min(1, (px * bx + py * by) / len2)) : 0;
+  return Math.hypot(px - bx * t, py - by * t);
+}
+
 export function decodePolyline(str = '', precision = 5) {
   const factor = 10 ** precision;
   const points = [];
