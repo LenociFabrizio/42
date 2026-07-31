@@ -116,10 +116,16 @@ export function mountShell({ active = '', hideNav = false } = {}) {
 
   // Polling notifiche (leggero): all'avvio e ogni 30s, e al ritorno in
   // foreground. Nello stesso giro controlliamo gli amici appena entrati online.
+  // Con la pagina in secondo piano si sta zitti: niente rete inutile e, cosa
+  // più importante, non ci si tiene "online" mentre l'app è solo aperta.
   pollUnread(bellDot);
   initPresence();
   clearInterval(_pollTimer);
-  _pollTimer = setInterval(() => { pollUnread(bellDot); checkFriendsOnline(); }, 30000);
+  _pollTimer = setInterval(() => {
+    if (document.hidden) return;
+    pollUnread(bellDot);
+    checkFriendsOnline();
+  }, 30000);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
     pollUnread(bellDot);

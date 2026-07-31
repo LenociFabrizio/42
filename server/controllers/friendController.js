@@ -15,8 +15,15 @@ import { FRIEND_STATUS, XP } from '../utils/constants.js';
 import { awardXp, checkBadges } from '../services/gamification.js';
 import { notify } from '../services/notifications.js';
 
-// Finestra di presenza: un utente è "online" se attivo negli ultimi 5 minuti.
-const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+// Finestra di presenza: "online" = attivo negli ultimi 3 minuti. Il client
+// ripassa ogni 30s e il battito si scrive al massimo una volta al minuto, quindi
+// 3 minuti danno margine doppio senza tenere online chi ha già chiuso l'app
+// (con 5 minuti l'etichetta restava indietro di un'eternità percepita).
+const ONLINE_WINDOW_MS = 3 * 60 * 1000;
+// Chi sta condividendo la posizione è online per definizione: qui vale la stessa
+// finestra della live map (liveController.nearby), così un amico non risulta
+// "offline" nell'elenco mentre il suo puntino è ancora sulla mappa.
+const LIVE_WINDOW_MS = 5 * 60 * 1000;
 
 /**
  * Interpreta un timestamp del DB ("YYYY-MM-DD HH:MM:SS", UTC) o una stringa
@@ -43,11 +50,11 @@ function lastPresence(u) {
   return a >= b ? u.last_active : u.last_seen;
 }
 
-/** Vero se l'istante di presenza cade entro la finestra "online". */
-function isOnline(value) {
+/** Vero se l'istante cade entro `windowMs` da adesso. */
+function within(value, windowMs) {
   const t = dbTime(value);
   if (Number.isNaN(t)) return false;
-  return Date.now() - t <= ONLINE_WINDOW_MS;
+  return Date.now() - t <= windowMs;
 }
 
 /**
@@ -56,7 +63,8 @@ function isOnline(value) {
  */
 function withPresence(u) {
   const last = lastPresence(u);
-  return { ...u, last_active: last, online: isOnline(last) };
+  const online = within(u.last_active, ONLINE_WINDOW_MS) || within(u.last_seen, LIVE_WINDOW_MS);
+  return { ...u, last_active: last, online };
 }
 
 /**

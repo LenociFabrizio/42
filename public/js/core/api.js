@@ -34,6 +34,11 @@ async function request(path, opts = {}) {
   const tk = token.get();
   if (auth && tk) headers['Authorization'] = `Bearer ${tk}`;
 
+  // Presenza: dice al server se l'app è davvero davanti agli occhi dell'utente.
+  // Senza questo, una scheda o una PWA lasciata aperta in secondo piano continua
+  // a interrogare le API e l'utente resta "online" per sempre agli amici.
+  headers['X-App-Active'] = typeof document !== 'undefined' && document.visibilityState !== 'visible' ? '0' : '1';
+
   let payload;
   if (isForm) {
     payload = body; // FormData: il browser imposta il Content-Type

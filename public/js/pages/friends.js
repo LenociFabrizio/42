@@ -14,8 +14,13 @@ import { $, el, svg, loader, toast, timeAgo, fmtSince, fmtDate, qs } from '../co
 import api from '../core/api.js';
 
 const DEFAULT_AVATAR = '/images/avatars/default.svg';
+// La presenza cambia da sola: la lista si riaggiorna da sé, altrimenti un amico
+// che ha appena chiuso l'app resterebbe "Online" finché non si ricarica la
+// pagina (ed è esattamente quello che sembrava un bug del calcolo online).
+const REFRESH_MS = 30000;
 let tab = qs.get('tab') || 'amici';
 let root, contentEl;
+let refreshTimer = null;
 
 async function main() {
   const user = await guard();
@@ -25,6 +30,18 @@ async function main() {
   root = $('#root');
   renderShell();
   loader.hide();
+
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(refreshPresence, REFRESH_MS);
+  // Al ritorno in primo piano ci si rimette in pari subito: i timer in secondo
+  // piano vengono congelati dal sistema.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshPresence(); });
+}
+
+/** Riaggiorna in silenzio la lista amici (solo sulla scheda "Amici"). */
+function refreshPresence() {
+  if (document.hidden || tab !== 'amici' || !contentEl) return;
+  loadFriends({ silent: true });
 }
 
 function renderShell() {
@@ -75,17 +92,22 @@ async function addFriend(input) {
 }
 
 /* -------------------- Amici -------------------- */
-async function loadFriends() {
-  contentEl.innerHTML = '';
-  contentEl.append(el('p', { class: 'text-lo text-center', text: 'Caricamento…' }));
+/** @param {{silent?:boolean}} opts silent = aggiornamento periodico, senza spinner */
+async function loadFriends({ silent = false } = {}) {
+  if (!silent) {
+    contentEl.innerHTML = '';
+    contentEl.append(el('p', { class: 'text-lo text-center', text: 'Caricamento…' }));
+  }
   try {
     const { friends } = await api.get('/friends');
+    if (tab !== 'amici') return; // scheda cambiata mentre arrivava la risposta
     contentEl.innerHTML = '';
     if (!friends || !friends.length) { contentEl.append(emptyState('🤝', 'Nessun amico', 'Aggiungi qualcuno con il suo nickname.')); return; }
     const list = el('div', { class: 'list' });
     for (const f of friends) list.append(friendRow(f));
     contentEl.append(list);
   } catch (err) {
+    if (silent) return; // rete assente: si tiene quello che c'è già a schermo
     contentEl.innerHTML = '';
     contentEl.append(emptyState('⚠️', 'Errore', err.message || 'Impossibile caricare gli amici.'));
   }
@@ -95,7 +117,7 @@ function friendRow(f) {
   // Offline: mostriamo da quanto tempo lo è (con la data esatta nel tooltip).
   const last = f.last_active || f.last_seen;
   const status = f.online
-    ? el('span', { class: 'pill green', text: '• Online' })
+    ? el('span', { class: 'pill green', text: '• Online', title: 'Sta usando l\'app in questo momento' })
     : el('span', {
       class: 'li-sub',
       style: 'white-space:nowrap; text-align:right',

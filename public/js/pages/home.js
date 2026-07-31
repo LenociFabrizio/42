@@ -87,13 +87,16 @@ async function main() {
     startWatch();
     refreshLive().then(hintLiveSharing);
     clearInterval(home._liveTimer);
-    home._liveTimer = setInterval(refreshLive, 8000);
+    // Con la mappa in secondo piano non c'è nulla da ridisegnare: si riprende
+    // al ritorno in primo piano (vedi visibilitychange).
+    home._liveTimer = setInterval(() => { if (!document.hidden) refreshLive(); }, 8000);
     // Battito della posizione: da fermi il GPS può non richiamarci per minuti e
     // agli amici scomparirei dalla mappa (la finestra "live" è di 5 minuti).
     // Se non abbiamo un fix recente, pushPositionNow() lo va a chiedere.
     clearInterval(home._shareTimer);
     home._shareTimer = setInterval(() => {
-      if (sharing && Date.now() - lastShareOkAt > 45000) pushPositionNow();
+      if (document.hidden || !sharing) return;
+      if (Date.now() - lastShareOkAt > 45000) pushPositionNow();
     }, 45000);
   });
   map.on('moveend', debounce(reload, 400));

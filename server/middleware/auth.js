@@ -22,9 +22,16 @@ function extractToken(req) {
  * una volta al minuto (il client interroga l'API ogni 30s) per non appesantire
  * ogni richiesta. È indipendente da last_seen, che riguarda solo la
  * condivisione live della posizione.
+ *
+ * "Online" deve voler dire "sta usando l'app", non "ha una scheda aperta": le
+ * richieste che arrivano da una pagina in secondo piano (header X-App-Active: 0)
+ * NON aggiornano la presenza, altrimenti una PWA dimenticata aperta terrebbe
+ * l'utente online per sempre agli occhi degli amici. Un client che non manda
+ * l'header viene considerato attivo (compatibilità con le versioni in cache).
  */
 const PRESENCE_TOUCH_MS = 60 * 1000;
-async function touchPresence(user) {
+async function touchPresence(req, user) {
+  if (req.headers['x-app-active'] === '0') return;
   const last = user.last_active ? Date.parse(`${String(user.last_active).replace(' ', 'T')}Z`) : NaN;
   if (!Number.isNaN(last) && Date.now() - last < PRESENCE_TOUCH_MS) return;
   try {
@@ -43,7 +50,7 @@ export async function requireAuth(req, _res, next) {
     const user = await db.prepare('SELECT * FROM users WHERE id = ? AND is_active = 1').get(payload.id);
     if (!user) return next(new HttpError(401, 'Utente non valido'));
     req.user = user;
-    await touchPresence(user);
+    await touchPresence(req, user);
     next();
   } catch {
     next(new HttpError(401, 'Token non valido o scaduto'));
