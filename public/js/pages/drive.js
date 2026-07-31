@@ -9,6 +9,7 @@ import '../core/theme.js';
 import { guard } from '../core/auth.js';
 import { registerPWA } from '../core/pwa.js';
 import { createMap, addMarker, viewportBbox, onMapReady } from '../core/map.js';
+import { bearing as bearingBetween } from '../core/geo.js';
 import { $, svg, loader, toast, debounce, esc } from '../core/ui.js';
 import { catIcon, DRIVE_MODE_ENABLED } from '../core/constants.js';
 import { TrackingSession, bgEnabled } from '../core/tracking.js';
@@ -32,13 +33,6 @@ const ARROW_HTML = `
       <path d="M12 2 4.5 21 12 17.4 19.5 21 12 2Z" fill="#ffb020" stroke="#120a00" stroke-width="1.3" stroke-linejoin="round" />
     </svg>
   </span>`;
-
-function bearingBetween(aLat, aLng, bLat, bLng) {
-  const toRad = (d) => (d * Math.PI) / 180, toDeg = (r) => (r * 180) / Math.PI;
-  const y = Math.sin(toRad(bLng - aLng)) * Math.cos(toRad(bLat));
-  const x = Math.cos(toRad(aLat)) * Math.sin(toRad(bLat)) - Math.sin(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.cos(toRad(bLng - aLng));
-  return (toDeg(Math.atan2(y, x)) + 360) % 360;
-}
 
 async function main() {
   // Funzionalità sospesa: chi arriva qui da un link salvato torna alla mappa.

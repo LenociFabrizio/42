@@ -36,13 +36,13 @@ const SLIDES = [
   },
   {
     ic: 'megaphone',
-    title: 'Avvisi di prossimità',
-    text: 'Quando arrivi entro 1 km da un percorso o dal ritrovo di un evento ti avvisiamo con un suono e un messaggio: puoi accettare al volo e fare il check-in GPS. Il suono si disattiva da Impostazioni.',
+    title: 'Il radar di prossimità',
+    text: 'Sotto la barra in alto compare un radar quando un percorso o un evento è nei paraggi: il blip mostra da che parte si trova. Sotto i 100 metri inizia a suonare piano e infittisce fino a diventare un allarme quando ci sei sopra. Toccalo per fare il check-in all\'evento o per registrare un tentativo. Il suono si disattiva da Impostazioni.',
   },
   {
     ic: 'pinUser',
     title: 'Vedersi in tempo reale',
-    text: 'Il tasto col segnaposto, in basso a destra, accende la condivisione: un tocco e gli amici ti vedono muoverti sulla mappa, e tu vedi loro. Il numero sul tasto dice quanti sono in strada adesso; toccandolo di nuovo apri l\'elenco per raggiungerli anche se sono lontani, o per smettere di condividere. Tocca un puntino per sapere che auto o moto sta guidando.',
+    text: 'Il tasto col segnaposto, in basso a destra, accende la condivisione: un tocco e gli amici ti vedono muoverti sulla mappa, e tu vedi loro. Sulla mappa sei la freccia bianca, gli amici sono le frecce verdi e gli sconosciuti quelle rosse: la punta indica dove stanno andando. Tocca una freccia per sapere che auto o moto sta guidando; il numero sul tasto dice quanti sono in strada adesso.',
   },
   {
     ic: 'users',

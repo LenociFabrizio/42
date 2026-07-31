@@ -27,6 +27,24 @@
     <div id="map"></div>
   </div>
 
+  <!-- Radar di prossimità (stile arcade), sotto la topbar: compare quando un
+       percorso o un evento è vicino e suona sempre più fitto avvicinandosi.
+       Toccalo per il check-in o per registrare un tentativo. Vedi home.js -->
+  <button id="radar" class="radar" type="button" hidden aria-label="Bersaglio vicino">
+    <span class="radar-disc">
+      <span class="radar-sweep"></span>
+      <span class="radar-ring r1"></span>
+      <span class="radar-ring r2"></span>
+      <span class="radar-blip"><i></i></span>
+      <span class="radar-me"></span>
+    </span>
+    <span class="radar-info">
+      <span class="radar-kind"></span>
+      <span class="radar-name"></span>
+      <span class="radar-dist"></span>
+    </span>
+  </button>
+
   <!-- Pulsanti flottanti mappa (stack a destra, sopra la bottom nav) -->
   <div class="map-fab-stack">
     <!-- Solo Mappa: nascosto finché DRIVE_MODE_ENABLED è false (vedi constants.js) -->

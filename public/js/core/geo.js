@@ -14,6 +14,19 @@ export function haversine(aLat, aLng, bLat, bLng) {
   return 2 * R_EARTH * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
+/**
+ * Rotta iniziale da A a B, in gradi 0-360 (0 = nord, 90 = est). Serve a orientare
+ * la freccia del pilota quando il GPS non fornisce `heading` (fermi o dispositivi
+ * senza bussola): la direzione si ricava dallo spostamento.
+ */
+export function bearing(aLat, aLng, bLat, bLng) {
+  const toDeg = (r) => (r * 180) / Math.PI;
+  const y = Math.sin(toRad(bLng - aLng)) * Math.cos(toRad(bLat));
+  const x = Math.cos(toRad(aLat)) * Math.sin(toRad(bLat))
+    - Math.sin(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.cos(toRad(bLng - aLng));
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
 export function decodePolyline(str = '', precision = 5) {
   const factor = 10 ** precision;
   const points = [];

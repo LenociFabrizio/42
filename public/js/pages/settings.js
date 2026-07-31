@@ -16,7 +16,7 @@ import { startTutorial } from '../core/onboarding.js';
 import { openBugReport } from '../core/bugreport.js';
 import { bgEnabled, setBgEnabled } from '../core/tracking.js';
 import { resetNavPrefs } from '../core/nav.js';
-import { soundEnabled, setSoundEnabled, playNotify, playBeep, playHorn, playFriendOnline, initSound } from '../core/sound.js';
+import { soundEnabled, setSoundEnabled, playNotify, playBeep, playHorn, playFriendOnline, playRadarPing, initSound } from '../core/sound.js';
 import api, { token } from '../core/api.js';
 
 const VIS = [
@@ -302,14 +302,19 @@ function soundCard() {
     el('button', { class: 'btn btn-outline btn-sm', html: `${svg('flag', 16)} Partenza`, onClick: () => playBeep(true) }),
     el('button', { class: 'btn btn-outline btn-sm', html: `${svg('users', 16)} Clacson`, onClick: () => playHorn() }),
     el('button', { class: 'btn btn-outline btn-sm', html: `${svg('pinUser', 16)} Amico online`, onClick: () => playFriendOnline() }),
+    // Prova del radar: tre ping in avvicinamento (lontano → sopra il bersaglio).
+    el('button', {
+      class: 'btn btn-outline btn-sm', html: `${svg('megaphone', 16)} Radar`,
+      onClick: () => { [0.05, 0.4, 1].forEach((k, i) => setTimeout(() => playRadarPing(k), i * 420)); },
+    }),
   ]);
   const note = el('div', { class: 'text-lo', style: 'font-size:.78rem;margin-top:8px' });
 
   function render() {
     const on = soundEnabled();
     note.textContent = on
-      ? 'Riguarda gli avvisi di prossimità (percorso o evento entro 1 km), il countdown di partenza, il clacson di saluto quando incroci un altro pilota e il blip quando un amico va online. Vale solo su questo dispositivo.'
-      : 'Tutti i suoni sono silenziati: avvisi di prossimità, countdown di partenza, clacson di saluto e blip "amico online". Vale solo su questo dispositivo.';
+      ? 'Riguarda il radar di prossimità (che infittisce avvicinandosi a un percorso o a un evento), il campanello degli avvisi, il countdown di partenza, il clacson di saluto quando incroci un altro pilota e il blip quando un amico va online. Vale solo su questo dispositivo.'
+      : 'Tutti i suoni sono silenziati: radar di prossimità, campanello, countdown di partenza, clacson di saluto e blip "amico online". Vale solo su questo dispositivo.';
     test.querySelectorAll('button').forEach((b) => { b.disabled = !on; });
   }
   render();

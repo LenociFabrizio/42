@@ -145,4 +145,28 @@ export function playFriendOnline() {
   try { navigator.vibrate?.(25); } catch { /* non supportato */ }
 }
 
-export default { initSound, playNotify, playBeep, playHorn, playFriendOnline, soundEnabled, setSoundEnabled };
+/**
+ * "Ping" del radar di prossimità: un solo bip secco da strumentazione, come il
+ * radar di NFS Most Wanted. Non decide da sé quando suonare — ci pensa il radar
+ * sulla mappa, che lo richiama sempre più spesso man mano che ti avvicini.
+ *
+ * @param {number} [intensity] 0 = appena entrato nel raggio, 1 = ci sei sopra.
+ *   Alza tono e volume: da lontano è un tocco discreto, vicino è un allarme.
+ */
+export function playRadarPing(intensity = 0) {
+  if (!soundEnabled()) return;
+  const c = audioCtx();
+  if (!c) return;
+  if (c.state === 'suspended') c.resume().catch(() => {});
+  const k = Math.min(1, Math.max(0, intensity));
+  try {
+    // Tono che sale con l'avvicinarsi (880 → 1500 Hz) e seconda voce ottava
+    // sopra solo nel finale: è quella che dà il senso di urgenza.
+    note(c, { freq: 880 + 620 * k, start: 0, duration: 0.05 + 0.03 * k, gain: 0.05 + 0.13 * k, type: 'square' });
+    if (k > 0.6) note(c, { freq: 2400, start: 0, duration: 0.04, gain: 0.05 * k, type: 'sine' });
+  } catch { /* audio non disponibile: silenzio */ }
+  // Vibrazione solo nell'ultimo tratto: a distanza sarebbe fastidiosa.
+  if (k > 0.75) { try { navigator.vibrate?.(18); } catch { /* non supportato */ } }
+}
+
+export default { initSound, playNotify, playBeep, playHorn, playFriendOnline, playRadarPing, soundEnabled, setSoundEnabled };

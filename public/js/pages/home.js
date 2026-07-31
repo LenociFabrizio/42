@@ -8,11 +8,11 @@ import { guard, auth } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
 import { createMap, addMarker, viewportBbox, fitRadius, fitPoints, onMapReady } from '../core/map.js';
-import { getCurrentPosition, decodePolyline, haversine } from '../core/geo.js';
+import { getCurrentPosition, decodePolyline, haversine, bearing } from '../core/geo.js';
 import { maybeAutoStart } from '../core/onboarding.js';
 import { $, svg, loader, toast, modal, el, esc, fmtDistance, fmtDuration, fmtSpeed, fmtSince, debounce } from '../core/ui.js';
 import { catIcon, poiIcon, catLabel, vehIcon, DEFAULT_MAP_RADIUS_KM, DRIVE_MODE_ENABLED } from '../core/constants.js';
-import { initSound, playNotify, playHorn } from '../core/sound.js';
+import { initSound, playHorn, playRadarPing } from '../core/sound.js';
 import { showDirections } from '../core/nav.js';
 import { showRideDisclaimer } from '../core/disclaimer.js';
 import api from '../core/api.js';
@@ -34,25 +34,45 @@ let lastShareOkAt = 0;     // ultimo invio accettato dal server
 let liveFriends = [];      // amici che stanno condividendo adesso
 let liveSheet = null;      // foglio "Posizione live" aperto (per aggiornarlo)
 
+/* Segnaposto in stile arcade (Need for Speed Most Wanted): una punta di freccia
+   con bordo scuro che indica la direzione di marcia, invece di un pallino che
+   lampeggia. Stessa forma per tutti i puntini vivi, colore dalla CSS via
+   `currentColor`: bianca io, verde gli amici, rossa gli sconosciuti.
+   Il triangolo interno scuro dà il rilievo tipico del HUD. */
+const arrowHtml = (size = 40) => `
+  <span class="arrow-mk">
+    <svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" aria-hidden="true">
+      <path d="M12 1.8 3.9 21.4 12 17.1 20.1 21.4 12 1.8Z" fill="currentColor" stroke="#05070b" stroke-width="1.5" stroke-linejoin="round" />
+      <path d="M12 6.4 7.6 17.4 12 15.1 12 6.4Z" fill="#05070b" opacity=".22" />
+    </svg>
+  </span>`;
+// Direzione di marcia degli altri piloti, per orientare la loro freccia.
+const liveHeadings = new Map();
+
 let mapRadiusKm = DEFAULT_MAP_RADIUS_KM; // raggio di visibilità (Impostazioni)
 let myPos = null;          // ultima posizione nota (per il saluto col clacson)
+let myHeading = 0;         // direzione di marcia mostrata dalla freccia (gradi)
+let prevFix = null;        // posizione precedente, per ricavare la direzione
 let myCoords = null;       // ultime coordinate GPS complete (per il battito live)
 let myCoordsAt = 0;        // quando è arrivato quel fix (ms)
 // Ultima posizione salvata: apre la mappa già dalle tue parti, senza attese.
 const LAST_POS_KEY = '4e2_last_pos';
 let centered = false;      // la mappa è già stata inquadrata su di me?
 
-// Prossimità: raggio MASSIMO entro cui può comparire l'avviso (1 km) e
-// margine extra usato solo per farlo sparire senza sfarfallii.
-const PROX_MAX_M = 1000;
-const PROX_HYSTERESIS_M = 250;
+// Radar di prossimità: entro RADAR_RANGE_M il bersaglio compare sul disco,
+// RADAR_HIDE_M è l'isteresi per non farlo sfarfallare al limite, da
+// RADAR_SOUND_M inizia il suono e a RADAR_LOCK_M è al massimo.
+const RADAR_RANGE_M = 1000;
+const RADAR_HIDE_M = 1250;
+const RADAR_SOUND_M = 100;
+const RADAR_CLOSE_M = 25;
+const RADAR_LOCK_M = 5;
 const markers = { routes: new Map(), events: new Map(), pois: new Map(), live: new Map() };
-// Dati correnti (per il rilevamento di prossimità) + stato del prompt.
+// Dati correnti (usati anche dal radar per calcolare il bersaglio più vicino).
 let dataRoutes = [];
 let dataEvents = [];
-const proxDismissed = new Set();
-let proxCurrent = null;
-let proxEl = null;
+let radarTarget = null;    // bersaglio agganciato {key,type,item,d,brg}
+let radarSounding = false; // anello del ping in corso?
 
 async function main() {
   const user = await guard();
@@ -117,10 +137,15 @@ async function main() {
     if (document.hidden || !map) return;
     if (sharing) pushPositionNow();
     refreshLive();
+    // Il radar riparte con la cadenza giusta: in secondo piano il timer viene
+    // strozzato dal sistema e la sequenza dei ping si sfalsa.
+    if (radarSounding) radarLoop();
   });
 
   $('#fab-locate').addEventListener('click', () => locate(true));
   $('#fab-live').addEventListener('click', onLiveFabClick);
+  // Il radar è un pulsante: check-in all'evento o tentativo sul percorso.
+  $('#radar').addEventListener('click', openRadarTarget);
 }
 
 /** Segue la posizione (aggiorna il marker "tu") e valuta la prossimità. */
@@ -129,6 +154,7 @@ function startWatch() {
   watchId = navigator.geolocation.watchPosition(
     (pos) => {
       const lat = pos.coords.latitude, lng = pos.coords.longitude;
+      updateHeading(lat, lng, pos.coords);
       myPos = { lat, lng };
       myCoords = pos.coords;
       myCoordsAt = Date.now();
@@ -136,7 +162,7 @@ function startWatch() {
       // Se l'inquadratura iniziale non è ancora riuscita (permesso concesso
       // in ritardo, primo fix lento), il primo aggiornamento centra la mappa.
       if (!centered) { centered = true; fitRadius(map, lat, lng, mapRadiusKm, { animate: true }); }
-      checkProximity(lat, lng);
+      updateRadar(lat, lng);
       shareLive(pos.coords);
     },
     () => {},
@@ -223,8 +249,47 @@ async function locate(fly = true, opts) {
 /** Marker "tu" + memoria dell'ultima posizione (per la prossima apertura). */
 function showMe(lat, lng) {
   if (userMarker) userMarker.setLngLat([lng, lat]);
-  else userMarker = addMarker(map, { lat, lng, className: 'mk-user pulse' });
+  else userMarker = addMarker(map, { lat, lng, className: 'mk-player', html: arrowHtml(40) });
+  turnArrow(userMarker, myHeading);
   try { localStorage.setItem(LAST_POS_KEY, JSON.stringify({ lat, lng })); } catch { /* quota */ }
+}
+
+/** Orienta la freccia di un marker (la CSS anima la rotazione). */
+function turnArrow(marker, deg) {
+  const arrow = marker?.getElement()?.querySelector('.arrow-mk');
+  if (arrow) arrow.style.transform = `rotate(${Math.round(deg || 0)}deg)`;
+}
+
+/**
+ * Direzione di marcia di un altro pilota: il `last_heading` inviato dal suo GPS
+ * se c'è, altrimenti la si ricava dallo spostamento fra due giri di polling.
+ * Da fermo si tiene l'ultima direzione: la freccia non deve girare a vuoto.
+ */
+function liveHeading(u) {
+  const prev = liveHeadings.get(u.id);
+  const moved = prev ? haversine(prev.lat, prev.lng, u.last_lat, u.last_lng) : Infinity;
+  let brg = prev?.brg ?? 0;
+  if (Number.isFinite(u.last_heading) && u.last_heading >= 0) brg = u.last_heading;
+  else if (prev && moved > 8) brg = bearing(prev.lat, prev.lng, u.last_lat, u.last_lng);
+  if (moved > 8) liveHeadings.set(u.id, { lat: u.last_lat, lng: u.last_lng, brg });
+  else if (prev) liveHeadings.set(u.id, { ...prev, brg });
+  return brg;
+}
+
+/**
+ * Direzione di marcia: il `heading` del GPS quando è affidabile (serve un minimo
+ * di movimento), altrimenti la si ricava dallo spostamento rispetto al punto
+ * precedente. Da fermi si tiene l'ultima direzione valida: la freccia non deve
+ * mettersi a girare a vuoto per colpa del rumore del GPS.
+ */
+function updateHeading(lat, lng, coords) {
+  const spd = Number.isFinite(coords?.speed) ? coords.speed : null;
+  const gps = Number.isFinite(coords?.heading) ? coords.heading : null;
+  if (gps != null && gps >= 0 && (spd == null || spd > 0.5)) myHeading = gps;
+  else if (prevFix && haversine(prevFix.lat, prevFix.lng, lat, lng) > 8) {
+    myHeading = bearing(prevFix.lat, prevFix.lng, lat, lng);
+  }
+  if (!prevFix || haversine(prevFix.lat, prevFix.lng, lat, lng) > 8) prevFix = { lat, lng };
 }
 
 /**
@@ -270,6 +335,8 @@ const reload = async () => {
     syncRoutes(dataRoutes);
     syncEvents(dataEvents);
     syncPois(p.pois || []);
+    // Con dati nuovi il bersaglio del radar può cambiare anche stando fermi.
+    if (myPos) updateRadar(myPos.lat, myPos.lng);
   } catch { /* offline: silenzioso */ }
 };
 
@@ -648,21 +715,29 @@ async function refreshLive() {
     for (const u of list) {
       seen.add(u.id);
       const html = livePopupHtml(u);
-      const existing = markers.live.get(u.id);
-      if (existing) {
-        existing.setLngLat([u.last_lng, u.last_lat]);
+      // Stessa freccia della mia posizione: verde se è un amico, rossa se è uno
+      // sconosciuto. Il colore lo mette la CSS, qui basta la classe.
+      const cls = `mk-live ${u.is_friend ? 'friend' : 'stranger'}`;
+      let mk = markers.live.get(u.id);
+      if (mk) {
+        mk.setLngLat([u.last_lng, u.last_lat]);
         // Aggiorna il contenuto (velocità e tempo scorrono) anche a popup aperto.
-        existing.getPopup()?.setHTML(html);
+        mk.getPopup()?.setHTML(html);
+        const node = mk.getElement()?.firstElementChild;
+        if (node && node.className !== cls) node.className = cls; // amicizia appena nata
       } else {
-        markers.live.set(u.id, addMarker(map, {
-          lat: u.last_lat, lng: u.last_lng, className: 'mk-friend',
-          html: `<img src="${esc(u.avatar || '/images/avatars/default.svg')}" alt="${esc(u.nickname)}">`,
-          popupHtml: html,
-        }));
+        mk = addMarker(map, {
+          lat: u.last_lat, lng: u.last_lng, className: cls,
+          html: arrowHtml(34), popupHtml: html,
+        });
+        markers.live.set(u.id, mk);
       }
+      turnArrow(mk, liveHeading(u));
     }
     // Rimuovi chi non è più live.
-    for (const [id, m] of markers.live) if (!seen.has(id)) { m.remove(); markers.live.delete(id); }
+    for (const [id, m] of markers.live) {
+      if (!seen.has(id)) { m.remove(); markers.live.delete(id); liveHeadings.delete(id); }
+    }
     lastLiveOkAt = Date.now();
   } catch { /* rete assente: si riprova al giro dopo */ }
   finally { refreshingLive = false; }
@@ -689,96 +764,151 @@ function announceNewLive() {
 }
 
 /* ============================================================
- *  PROSSIMITÀ — quando ti avvicini a un percorso o a un evento,
- *  compare un prompt animato per partecipare (Sì/No). Se ti allontani
- *  il prompt sparisce e l'app torna com'era. Isteresi enter/exit per
- *  evitare che appaia e sparisca di continuo.
+ *  RADAR DI PROSSIMITÀ (stile arcade)
+ *  Sotto la topbar compare un disco con anelli e sweep rotante: il blip mostra
+ *  dove si trova il bersaglio più vicino (un evento o la partenza di un
+ *  percorso), con l'angolo della direzione reale e il raggio proporzionale alla
+ *  distanza. Da 100 m inizia a suonare piano e infittisce fino all'allarme a
+ *  5 m. Toccandolo si fa il check-in all'evento o si registra un tentativo.
+ *
+ *  Ha preso il posto del vecchio pannello Sì/No che compariva da solo: mentre si
+ *  guida un avviso che occupa lo schermo è la cosa meno desiderabile.
  * ============================================================ */
-function checkProximity(lat, lng) {
-  const candidates = [];
-
-  // L'area di prossimità non supera MAI 1 km: il prompt può comparire solo
-  // entro PROX_MAX_M. La soglia di uscita (più larga) serve unicamente a
-  // NASCONDERE il prompt senza farlo lampeggiare a ogni oscillazione del GPS.
+/** Bersaglio più vicino tra eventi e partenze dei percorsi caricati. */
+function nearestTarget(lat, lng) {
+  let best = null;
+  const consider = (key, type, item, tLat, tLng) => {
+    if (tLat == null || tLng == null) return;
+    const d = haversine(lat, lng, tLat, tLng);
+    if (!best || d < best.d) best = { key, type, item, d, brg: bearing(lat, lng, tLat, tLng) };
+  };
   for (const ev of dataEvents) {
     if (ev.status === 'ended' || ev.status === 'cancelled') continue;
-    const enter = Math.min(ev.radius_m || PROX_MAX_M, PROX_MAX_M);
-    const exit = enter + PROX_HYSTERESIS_M;
-    const d = haversine(lat, lng, ev.area_lat, ev.area_lng);
-    const key = `e${ev.id}`;
-    if (d > exit) { proxDismissed.delete(key); if (proxCurrent === key) hideProx(); continue; }
-    if (d <= enter && !proxDismissed.has(key)) candidates.push({ key, type: 'event', item: ev, d });
+    consider(`e${ev.id}`, 'event', ev, ev.area_lat, ev.area_lng);
   }
-  for (const rt of dataRoutes) {
-    const enter = PROX_MAX_M;
-    const exit = enter + PROX_HYSTERESIS_M;
-    const d = haversine(lat, lng, rt.start_lat, rt.start_lng);
-    const key = `r${rt.id}`;
-    if (d > exit) { proxDismissed.delete(key); if (proxCurrent === key) hideProx(); continue; }
-    if (d <= enter && !proxDismissed.has(key)) candidates.push({ key, type: 'route', item: rt, d });
-  }
-
-  if (proxCurrent) return; // un prompt alla volta: resta finché non ci si allontana/risponde
-  if (!candidates.length) return;
-  candidates.sort((a, b) => a.d - b.d);
-  showProx(candidates[0], lat, lng);
+  for (const rt of dataRoutes) consider(`r${rt.id}`, 'route', rt, rt.start_lat, rt.start_lng);
+  return best;
 }
 
-function showProx(cand, lat, lng) {
-  hideProx(true);
-  proxCurrent = cand.key;
-  const isEvent = cand.type === 'event';
-  const name = cand.item.name || (isEvent ? 'evento' : 'percorso');
+/** Ricalcola il bersaglio e aggiorna disco e suono. */
+function updateRadar(lat, lng) {
+  const t = nearestTarget(lat, lng);
+  // Isteresi: il bersaglio già agganciato resta fino a RADAR_HIDE_M, così al
+  // limite del raggio il radar non appare e sparisce a ogni oscillazione GPS.
+  const limit = t && radarTarget && t.key === radarTarget.key ? RADAR_HIDE_M : RADAR_RANGE_M;
+  radarTarget = t && t.d <= limit ? t : null;
+  paintRadar();
+  if (radarTarget && radarTarget.d <= RADAR_SOUND_M) startRadarSound();
+  else stopRadarSound();
+}
 
-  const yes = el('button', { class: 'btn btn-primary', text: 'Sì' });
-  const no = el('button', { class: 'btn btn-outline', text: 'No, grazie' });
-  // Titolo coerente con la distanza: "sei al ritrovo/inizio" solo se davvero
-  // vicino, altrimenti "sei vicino a" (l'avviso arriva fino a 1 km).
-  const close = cand.d <= 200;
-  const title = isEvent
-    ? (close ? `Sei al ritrovo di «${name}»` : `Sei vicino al ritrovo di «${name}»`)
-    : (close ? `Sei all'inizio di «${name}»` : `Sei vicino a «${name}»`);
+/** Disegna lo stato del radar (testi, blip, intensità). */
+function paintRadar() {
+  const box = $('#radar');
+  if (!box) return;
+  if (!radarTarget) {
+    box.hidden = true;
+    document.body.classList.remove('radar-on');
+    return;
+  }
+  const { type, item, d, brg } = radarTarget;
+  const isEvent = type === 'event';
+  const name = item.name || (isEvent ? 'Evento' : 'Percorso');
+  box.hidden = false;
+  document.body.classList.add('radar-on');
+  box.classList.toggle('near', d <= RADAR_SOUND_M);
+  box.classList.toggle('close', d <= RADAR_CLOSE_M);
+  box.querySelector('.radar-kind').textContent = isEvent ? 'Evento' : 'Percorso';
+  box.querySelector('.radar-name').textContent = name;
+  box.querySelector('.radar-dist').textContent = `${fmtDistance(d)} · ${isEvent ? 'tocca per il check-in' : 'tocca per un tentativo'}`;
+  box.setAttribute('aria-label', `${isEvent ? 'Evento' : 'Percorso'} ${name} a ${fmtDistance(d)}`);
 
-  proxEl = el('div', { class: 'prox-prompt' }, [
-    el('div', { class: 'prox-head' }, [
-      el('div', { class: 'prox-ic', html: svg(isEvent ? 'megaphone' : 'flag', 24) }),
-      el('div', { style: 'min-width:0' }, [
-        el('div', { class: 'prox-title', text: title }),
-        el('div', { class: 'prox-sub', text: isEvent ? 'Vuoi partecipare e fare il check-in?' : 'Vuoi registrare un tentativo su questo percorso?' }),
-      ]),
-    ]),
-    el('div', { class: 'prox-actions' }, [no, yes]),
+  // Blip: angolo = direzione reale del bersaglio (mappa a nord in alto), raggio
+  // in radice quadrata così i bersagli vicini non collassano tutti sul centro.
+  const r = Math.sqrt(Math.min(d, RADAR_RANGE_M) / RADAR_RANGE_M) * 24;
+  const rad = (brg * Math.PI) / 180;
+  const x = (Math.sin(rad) * r).toFixed(1);
+  const y = (-Math.cos(rad) * r).toFixed(1);
+  box.querySelector('.radar-blip').style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+}
+
+/**
+ * Cadenza e intensità del ping in base alla distanza: 100 m → un tocco ogni
+ * 1,2 s appena percettibile; 50 m → 0,7 s; 5 m → 0,14 s a volume pieno.
+ */
+function radarSpec(d) {
+  const lerp = (a, b, t) => a + (b - a) * t;
+  if (d >= 50) {
+    const t = (RADAR_SOUND_M - Math.min(RADAR_SOUND_M, d)) / (RADAR_SOUND_M - 50);
+    return { ms: lerp(1200, 700, t), k: lerp(0.05, 0.35, t) };
+  }
+  const t = (50 - Math.max(RADAR_LOCK_M, d)) / (50 - RADAR_LOCK_M);
+  return { ms: lerp(700, 140, t), k: lerp(0.35, 1, t) };
+}
+
+function startRadarSound() {
+  if (radarSounding) return;
+  radarSounding = true;
+  radarLoop();
+}
+function stopRadarSound() {
+  radarSounding = false;
+  clearTimeout(home._radarPing);
+}
+/**
+ * Anello del suono: si riprogramma da sé leggendo OGNI VOLTA la distanza
+ * corrente, così la cadenza segue l'avvicinarsi senza essere riavviata (e
+ * rimandata) a ogni aggiornamento GPS.
+ */
+function radarLoop() {
+  if (!radarSounding) return;
+  clearTimeout(home._radarPing);
+  const d = radarTarget?.d;
+  if (d == null || d > RADAR_SOUND_M) { stopRadarSound(); return; }
+  const { ms, k } = radarSpec(d);
+  if (!document.hidden) playRadarPing(k);
+  home._radarPing = setTimeout(radarLoop, ms);
+}
+
+/** Tocco sul radar: l'azione giusta per il bersaglio agganciato. */
+function openRadarTarget() {
+  const t = radarTarget;
+  if (!t) return;
+  if (t.type === 'event') openCheckinSheet(t.item, t.d);
+  else openAttemptSheet(t.item, t.d);
+}
+
+function openCheckinSheet(ev, d) {
+  const go = el('button', { class: 'btn btn-primary btn-block', html: `${svg('check', 20)} Fai il check-in` });
+  const body = el('div', {}, [
+    el('p', { class: 'text-mid mb-3', text: `Sei a ${fmtDistance(d)} dal ritrovo. Il check-in conferma la tua presenza: la posizione viene verificata dal server.` }),
+    go,
+    el('a', { class: 'btn btn-outline btn-block', style: 'margin-top:var(--sp-2)', href: `/event.html?id=${ev.id}`, text: 'Apri evento' }),
   ]);
-  document.body.append(proxEl);
-  // Avviso acustico: a bordo lo schermo non lo si guarda.
-  playNotify();
-
-  no.addEventListener('click', () => { proxDismissed.add(cand.key); hideProx(); });
-  yes.addEventListener('click', async () => {
-    if (isEvent) {
-      yes.disabled = true; yes.textContent = 'Check-in…';
-      try {
-        const res = await api.post(`/events/${cand.item.id}/checkin`, { lat, lng });
-        toast.success('Sei presente all\'evento! ✅');
-        proxDismissed.add(cand.key);
-        hideProx();
-      } catch (err) {
-        toast.error(err.message || 'Check-in non riuscito.');
-        yes.disabled = false; yes.textContent = 'Sì';
-      }
-    } else {
-      location.href = `/record.html?route=${cand.item.id}`;
+  const m = modal({ title: ev.name || 'Evento', content: body });
+  go.addEventListener('click', async () => {
+    if (!myPos) { toast.warning('Posizione non disponibile: controlla i permessi GPS.'); return; }
+    go.disabled = true;
+    go.textContent = 'Check-in…';
+    try {
+      await api.post(`/events/${ev.id}/checkin`, { lat: myPos.lat, lng: myPos.lng });
+      m.close();
+      toast.success('Sei presente all\'evento! ✅');
+    } catch (err) {
+      toast.error(err.message || 'Check-in non riuscito.');
+      go.disabled = false;
+      go.innerHTML = `${svg('check', 20)} Fai il check-in`;
     }
   });
 }
 
-function hideProx(immediate = false) {
-  const node = proxEl;
-  proxEl = null; proxCurrent = null;
-  if (!node) return;
-  if (immediate) { node.remove(); return; }
-  node.classList.add('leaving');
-  setTimeout(() => node.remove(), 260);
+function openAttemptSheet(rt, d) {
+  const body = el('div', {}, [
+    el('p', { class: 'text-mid mb-3', text: `Sei a ${fmtDistance(d)} dalla partenza. Registrando il giro il tuo tempo entra nella classifica del percorso.` }),
+    el('a', { class: 'btn btn-primary btn-block', href: `/record.html?route=${rt.id}`, html: `${svg('play', 20)} Registra un tentativo` }),
+    el('a', { class: 'btn btn-outline btn-block', style: 'margin-top:var(--sp-2)', href: `/route.html?id=${rt.id}`, text: 'Apri percorso' }),
+  ]);
+  modal({ title: rt.name || 'Percorso', content: body });
 }
 
 const home = {};
