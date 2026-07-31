@@ -337,21 +337,40 @@
 }
 
 /* ---------------- Popup mappa (tema app) ----------------
-   MapLibre disegna popup bianchi: qui li allineiamo al tema scuro/chiaro. */
-.maplibregl-popup-content {
+   MapLibre disegna popup bianchi: qui li allineiamo al tema scuro/chiaro.
+   I selettori sono volutamente più specifici dei suoi (`.maplibregl-popup` in
+   più): il CSS della libreria arriva da CDN e non deve poter vincere per
+   ordine di caricamento, altrimenti tornano scritte bianche su bianco. */
+.maplibregl-popup .maplibregl-popup-content {
   background: var(--bg-100); color: var(--text-hi);
   border: 1px solid var(--border-strong); border-radius: var(--r-lg);
   padding: 12px 14px; box-shadow: var(--sh-lg); font-size: 0.88rem;
+  font-family: var(--font-sans);
 }
-.maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: var(--border-strong); }
-.maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: var(--border-strong); }
-.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--border-strong); }
-.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--border-strong); }
+.maplibregl-popup .maplibregl-popup-content a { color: var(--accent); font-weight: var(--fw-semibold); }
+.maplibregl-popup .maplibregl-popup-close-button { color: var(--text-lo); font-size: 1.1rem; }
+/* La punta prende il colore della card: così il fumetto sembra un pezzo solo. */
+.maplibregl-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: var(--bg-100); }
+.maplibregl-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: var(--bg-100); }
+.maplibregl-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--bg-100); }
+.maplibregl-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--bg-100); }
+.maplibregl-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.maplibregl-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: var(--bg-100); }
+.maplibregl-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.maplibregl-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: var(--bg-100); }
+
+/* Popup semplice (POI, partecipanti, percorsi): titolo + riga di dettaglio. */
+.map-popup { display: flex; flex-direction: column; gap: 4px; max-width: 220px; }
+.map-popup strong {
+  font-family: var(--font-display); font-weight: var(--fw-bold);
+  font-size: 1rem; line-height: 1.15; color: var(--text-hi);
+}
+.map-popup span { color: var(--text-mid); font-size: 0.82rem; line-height: 1.35; }
 
 /* Scheda utente live dentro il popup: si legge in un colpo d'occhio, con lo
    schermo al sole e il mezzo in movimento. Etichetta piccola in alto (ambra,
    maiuscoletto) e dato grande e pieno sotto, come su un quadrante. */
-.live-popup { min-width: 208px; }
+.live-popup { min-width: 216px; }
 .live-popup .lp-head {
   display: flex; align-items: center; gap: 10px;
   padding-bottom: 10px; margin-bottom: 10px;
@@ -739,6 +758,33 @@ body.radar-on .toast-stack { top: calc(var(--topbar-h) + var(--safe-top) + 82px)
   background: var(--accent-dim); color: var(--accent);
   border-color: var(--accent); font-weight: var(--fw-semibold);
 }
+
+/* Cartello "zona interdetta" al centro di un'area non ancora conquistata: sta
+   sopra il velo a strisce disegnato da setRegionFog(). Lucchetto ambra su vetro
+   scuro, bordo tratteggiato come il confine: si legge da lontano e si capisce
+   subito che non è un segnaposto da toccare per andarci. */
+.area-lock {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 9px 4px 7px;
+  border-radius: var(--r-pill);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px dashed rgba(255, 176, 32, 0.55);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+  color: var(--accent);
+  cursor: pointer; user-select: none; white-space: nowrap;
+}
+.area-lock:active { transform: scale(0.96); }
+.area-lock-ic { display: flex; filter: drop-shadow(0 0 6px var(--accent-glow)); }
+.area-lock b {
+  font-family: var(--font-display); font-weight: var(--fw-bold);
+  font-size: 0.72rem; line-height: 1; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-hi);
+}
+/* Italia intera nello schermo: i nomi si accavallerebbero, resta il lucchetto. */
+.areas-far .area-lock { padding: 5px; gap: 0; }
+.areas-far .area-lock b { display: none; }
 
 /* ---------------- Cornici per privacy (percorsi/eventi) ---------------- */
 .priv-private { border-color: var(--warning) !important; }

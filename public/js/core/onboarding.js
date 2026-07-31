@@ -22,7 +22,7 @@ const SLIDES = [
   {
     ic: 'compass',
     title: 'Aree da conquistare',
-    text: 'L\'Italia è divisa in 20 Aree: la tua regione di partenza è già scoperta, tutte le altre restano in ombra sotto un velo scuro. Si sbloccano in un solo modo: entrandoci davvero. Quando accade te lo diciamo con un suono e un avviso, arrivano XP e crescono la missione "Cacciatore di Aree" e i distintivi da "Oltre il Confine" fino a "Stivale Completo" con tutte e 20.',
+    text: 'L\'Italia è divisa in 20 Aree: la tua regione di partenza è già scoperta, tutte le altre restano zone interdette — velo scuro, strisce diagonali e un lucchetto col nome al centro. Si sbloccano in un solo modo: entrandoci davvero. Quando accade te lo diciamo con un suono e un avviso, arrivano XP e crescono la missione "Cacciatore di Aree" e i distintivi da "Oltre il Confine" fino a "Stivale Completo" con tutte e 20.',
   },
   {
     ic: 'navigation',
@@ -47,7 +47,7 @@ const SLIDES = [
   {
     ic: 'pinUser',
     title: 'Vedersi in tempo reale',
-    text: 'Il tasto col segnaposto, in basso a destra, accende la condivisione: un tocco e gli amici ti vedono muoverti sulla mappa, e tu vedi loro. Sulla mappa sei la freccia bianca, gli amici sono le frecce verdi e gli sconosciuti quelle rosse: la punta indica dove stanno andando. Tocca una freccia per sapere che auto o moto sta guidando; il numero sul tasto dice quanti sono in strada adesso.',
+    text: 'Il tasto col segnaposto, in basso a destra, accende la condivisione: un tocco e gli amici ti vedono muoverti sulla mappa, e tu vedi loro. È uno scambio alla pari: chi spegne sparisce dalla mappa degli altri e loro dalla sua. Sulla mappa sei la freccia bianca, gli amici sono le frecce verdi e gli sconosciuti quelle rosse: la punta indica dove stanno andando. Tocca una freccia per sapere che auto o moto sta guidando; il numero sul tasto dice quanti sono in strada adesso.',
   },
   {
     ic: 'users',

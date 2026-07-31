@@ -136,6 +136,9 @@
   display: flex; align-items: center; justify-content: center;
   border: 2px solid var(--bg-000);
 }
+/* Amici in strada mentre TU non stai condividendo: il numero c'è (è l'invito ad
+   accendere) ma spento, perché le loro posizioni non sono sulla mappa. */
+.map-fab .fab-count.muted { background: var(--bg-300); color: var(--text-hi); }
 .map-fab-stack { position: absolute; right: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2);
   bottom: calc(var(--bottomnav-h) + var(--safe-bottom) + var(--sp-3)); z-index: var(--z-hud); }
 

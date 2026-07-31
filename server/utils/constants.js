@@ -43,6 +43,13 @@ export const FRIEND_STATUS = {
 // Livello minimo per sbloccare la Live Map multiplayer (anti-spam / progressione).
 export const LIVE_MAP_MIN_LEVEL = 5;
 
+// Quanto vale l'ultimo battito di posizione prima di considerare un utente non
+// più "in strada". Il client, con l'app in primo piano, ne manda uno almeno ogni
+// 45s: 180s sono quattro battiti di margine (rete ballerina, timer strozzati),
+// ma anche il tempo massimo in cui si resta visibili dopo aver chiuso l'app.
+// Più corto sarebbe fragile, più lungo lascerebbe fantasmi sulla mappa.
+export const LIVE_STALE_SECONDS = 180;
+
 // Lunghezza minima di un percorso creato (metri). Deve restare allineata a
 // MIN_ROUTE_DISTANCE_M in public/js/core/constants.js.
 export const MIN_ROUTE_DISTANCE_M = 2000;

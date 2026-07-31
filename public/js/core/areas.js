@@ -50,6 +50,15 @@ export function areaName(code) {
   return state.regions.find((r) => r.code === code)?.name || code || '';
 }
 
+/**
+ * Nome dell'area dal nome GeoJSON. Servono entrambi perché due regioni sul
+ * GeoJSON portano la dicitura bilingue ("Trentino-Alto Adige/Südtirol"): sui
+ * cartelli della mappa mostriamo il nome che usa l'app.
+ */
+export function nameByGeoName(geoName) {
+  return state.regions.find((r) => (r.geo_name || r.name) === geoName)?.name || geoName;
+}
+
 function apply(data) {
   if (!data) return state;
   if (Array.isArray(data.regions) && data.regions.length) state.regions = data.regions;
@@ -184,4 +193,4 @@ function distance(aLat, aLng, bLat, bLng) {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
-export default { areas, loadAreas, ensureHomeArea, checkArea, discoveredGeoNames, homeGeoName, onAreasChange };
+export default { areas, loadAreas, ensureHomeArea, checkArea, discoveredGeoNames, homeGeoName, nameByGeoName, onAreasChange };

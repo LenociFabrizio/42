@@ -235,7 +235,7 @@ function liveCard(me) {
 
   return card('Live Map', [
     toggle,
-    el('div', { class: 'text-lo', style: 'font-size:.78rem;margin-top:6px', text: `È lo stesso interruttore del tasto col segnaposto in basso a destra sulla mappa. La condivisione con gli amici è sempre disponibile: per essere visibile anche agli sconosciuti imposta "Visibilità posizione" su "Pubblico", e accadrà solo dal livello ${LIVE_MAP_MIN_LEVEL}.` }),
+    el('div', { class: 'text-lo', style: 'font-size:.78rem;margin-top:6px', text: `È lo stesso interruttore del tasto col segnaposto in basso a destra sulla mappa. Lo scambio è alla pari: spegnendolo sparisci dalla mappa degli altri e loro dalla tua. La condivisione con gli amici è sempre disponibile: per essere visibile anche agli sconosciuti imposta "Visibilità posizione" su "Pubblico", e accadrà solo dal livello ${LIVE_MAP_MIN_LEVEL}.` }),
     vehSlot,
   ]);
 }

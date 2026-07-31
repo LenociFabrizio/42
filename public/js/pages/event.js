@@ -313,7 +313,7 @@ async function refreshParticipants() {
         friendMarkers.set(p.user_id, addMarker(map, {
           lat: p.last_lat, lng: p.last_lng, className: 'mk-friend',
           html: `<img src="${esc(p.avatar || DEFAULT_AVATAR)}" alt="${esc(p.nickname || '')}">`,
-          popupHtml: `<strong>${esc(p.nickname || 'Rider')}</strong>`,
+          popupHtml: `<div class="map-popup"><strong>${esc(p.nickname || 'Rider')}</strong><span>Al ritrovo adesso</span></div>`,
         }));
       }
     }

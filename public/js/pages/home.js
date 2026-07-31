@@ -8,7 +8,7 @@ import { guard, auth } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
 import { createMap, addMarker, viewportBbox, fitRadius, fitPoints, onMapReady, setRegionFog, fitRegion } from '../core/map.js';
-import { ensureHomeArea, checkArea, discoveredGeoNames, homeGeoName, onAreasChange } from '../core/areas.js';
+import { ensureHomeArea, checkArea, discoveredGeoNames, homeGeoName, nameByGeoName, onAreasChange } from '../core/areas.js';
 import { getCurrentPosition, decodePolyline, haversine, bearing } from '../core/geo.js';
 import { maybeAutoStart } from '../core/onboarding.js';
 import { $, svg, loader, toast, modal, el, esc, fmtDistance, fmtDuration, fmtSpeed, fmtSince, debounce } from '../core/ui.js';
@@ -25,6 +25,7 @@ let userMarker = null;
 // copia locale, riallineata a ogni cambio e a ogni rifiuto del server.
 const LIVE_HINT_KEY = '4e2_live_hint';
 const LIVE_POLL_MS = 8000; // ogni quanto si aggiornano i puntini degli amici
+const LIVE_IDLE_POLL_MS = 60000; // senza condividere: solo il conto, di rado
 let sharing = false;       // sto condividendo la mia posizione?
 let refreshingLive = false; // un giro di /live/nearby è già in corso?
 let lastLiveOkAt = 0;      // ultimo giro andato a buon fine
@@ -33,6 +34,7 @@ let watchId = null;
 let lastShareAt = 0;       // throttle invio posizione live
 let lastShareOkAt = 0;     // ultimo invio accettato dal server
 let liveFriends = [];      // amici che stanno condividendo adesso
+let friendsLiveCount = 0;  // quanti sono in strada (anche se non condivido: solo il numero)
 let liveSheet = null;      // foglio "Posizione live" aperto (per aggiornarlo)
 
 /* Segnaposto in stile arcade (Need for Speed Most Wanted): una punta di freccia
@@ -120,22 +122,29 @@ async function main() {
     clearInterval(home._liveTimer);
     // Con la mappa in secondo piano non c'è nulla da ridisegnare: si riprende
     // al ritorno in primo piano (vedi visibilitychange).
-    home._liveTimer = setInterval(() => { if (!document.hidden) refreshLive(); }, LIVE_POLL_MS);
+    home._liveTimer = setInterval(() => {
+      if (document.hidden) return;
+      // Senza condivisione non ci sono puntini da muovere (il server non ne
+      // manda): si chiede solo di rado, per sapere se qualche amico è in strada.
+      if (!sharing && Date.now() - lastLiveOkAt < LIVE_IDLE_POLL_MS) return;
+      refreshLive();
+    }, LIVE_POLL_MS);
     // Battito della posizione: da fermi il GPS può non richiamarci per minuti e
-    // agli amici scomparirei dalla mappa (la finestra "live" è di 5 minuti).
-    // Se non abbiamo un fix recente, pushPositionNow() lo va a chiedere.
+    // agli amici scomparirei dalla mappa (la finestra "live" è di 3 minuti, vedi
+    // LIVE_STALE_SECONDS). Senza un fix recente, pushPositionNow() lo va a chiedere.
     clearInterval(home._shareTimer);
     home._shareTimer = setInterval(() => {
       if (document.hidden) return;
       // Rete di sicurezza: se il giro degli amici si è fermato (timer strozzato
       // dal sistema, richiesta persa) lo si rimette in moto.
-      if (Date.now() - lastLiveOkAt > 3 * LIVE_POLL_MS) refreshLive();
+      if (sharing && Date.now() - lastLiveOkAt > 3 * LIVE_POLL_MS) refreshLive();
       if (sharing && Date.now() - lastShareOkAt > 45000) pushPositionNow();
     }, 45000);
   });
   // Spostando la vista si ricaricano contenuti E chi è live in zona: senza
   // questo, gli sconosciuti della nuova area comparivano solo al giro dopo.
-  map.on('moveend', debounce(() => { reload(); refreshLive(); }, 400));
+  // (Chi non condivide non ha puntini da ricaricare: solo i contenuti.)
+  map.on('moveend', debounce(() => { reload(); if (sharing) refreshLive(); }, 400));
 
   // Tornando in primo piano i timer sono stati congelati dal sistema: ci
   // rimettiamo in pari subito, altrimenti per qualche minuto risulteremmo
@@ -206,10 +215,8 @@ async function shareLive(coords) {
     // acceso: è così che "condivido ma non mi vedono" restava invisibile.
     lastShareAt = 0;
     if (err?.status === 403) {
-      sharing = false;
-      lastShareOkAt = 0;
       auth.patchUser({ live_enabled: 0 });
-      paintLiveFab();
+      goneFromLiveMap();
     }
     return false;
   }
@@ -333,7 +340,12 @@ async function centerOnMe() {
 /** Svela le aree scoperte e lascia in ombra quelle ancora da conquistare. */
 function paintFog() {
   if (!map) return;
-  setRegionFog(map, discoveredGeoNames());
+  setRegionFog(map, discoveredGeoNames(), {
+    labelFor: nameByGeoName,
+    // Il cartello col lucchetto risponde: dice come si sblocca, invece di
+    // lasciare l'utente a chiedersi se sia un segnaposto rotto.
+    onLocked: (name) => toast.info(`${name} è ancora da conquistare: entra nella regione e l'area si sblocca.`, { duration: 4200 }),
+  });
 }
 
 /** Legge il raggio di visibilità preferito (Impostazioni), con fallback. */
@@ -389,7 +401,10 @@ function syncPois(pois) {
     if (markers.pois.has(po.id)) continue;
     const m = addMarker(map, {
       lat: po.lat, lng: po.lng, className: 'mk poi', html: svg(poiIcon(po.category), 14),
-      popupHtml: `<strong>${po.name}</strong><br><span style="color:#666">${po.description || ''}</span>`,
+      // Niente colori fissi nel popup: li mette il tema (.map-popup), altrimenti
+      // il testo resta illeggibile sulla card scura. Nome e descrizione arrivano
+      // dal database: vanno sempre passati da esc().
+      popupHtml: `<div class="map-popup"><strong>${esc(po.name)}</strong>${po.description ? `<span>${esc(po.description)}</span>` : ''}</div>`,
     });
     markers.pois.set(po.id, m);
   }
@@ -453,18 +468,22 @@ const stat = (v, k) => el('div', { class: 'stat' }, [el('div', { class: 'v', tex
 function paintLiveFab() {
   const fab = $('#fab-live');
   if (!fab) return;
-  const n = liveFriends.length;
+  // Condividendo, il conto è quello dei puntini disegnati; se non condivido, il
+  // numero arriva dal server senza nessuna posizione (vedi `friends_live`).
+  const n = sharing ? liveFriends.length : friendsLiveCount;
+  const people = n === 1 ? '1 amico' : `${n} amici`;
   fab.classList.toggle('active', sharing);
   fab.setAttribute('aria-label', sharing ? 'Stai condividendo la posizione' : 'Condividi la posizione con gli amici');
   fab.title = sharing
-    ? (n ? `Stai condividendo · ${n === 1 ? '1 amico' : `${n} amici`} in strada` : 'Stai condividendo la posizione')
-    : 'Condividi la tua posizione con gli amici';
+    ? (n ? `Stai condividendo · ${people} in strada` : 'Stai condividendo la posizione')
+    : (n ? `${people} in strada: condividi anche tu per vederli` : 'Condividi la tua posizione con gli amici');
 
   // Contatore: si vede a colpo d'occhio se c'è qualcuno in strada, anche
   // quando il suo puntino è fuori dalla vista.
   let count = fab.querySelector('.fab-count');
   if (n > 0) {
     if (!count) { count = el('span', { class: 'fab-count' }); fab.append(count); }
+    count.classList.toggle('muted', !sharing);
     count.textContent = n > 9 ? '9+' : String(n);
   } else count?.remove();
 }
@@ -509,13 +528,36 @@ async function stopSharing() {
   try {
     await api.put('/live/settings', { live_enabled: false });
     auth.patchUser({ live_enabled: 0 });
-    sharing = false;
-    lastShareOkAt = 0;
-    paintLiveFab();
-    toast.info('Condivisione disattivata: non sei più sulla mappa degli amici.');
+    goneFromLiveMap();
+    toast.info('Condivisione disattivata: non sei più sulla mappa degli amici, e loro non sono più sulla tua.');
   } catch (err) {
     toast.error(err.message || 'Non è stato possibile disattivare la condivisione.');
   }
+}
+
+/**
+ * Fuori dalla mappa dei vivi: la condivisione è spenta, quindi si cancellano
+ * SUBITO anche i puntini degli altri. È la stessa regola che applica il server
+ * (`nearby` non restituisce posizioni a chi non condivide): senza pulire qui,
+ * le frecce degli amici resterebbero disegnate fino al giro dopo — ferme, e
+ * quindi bugiarde. Vale sia quando spegni tu, sia quando lo scopriamo da un 403.
+ */
+function goneFromLiveMap() {
+  sharing = false;
+  lastShareOkAt = 0;
+  // Gli amici in strada restano quelli: cambia solo che non ne vediamo più la
+  // posizione. Il numero resta sul tasto, spento, come invito a riaccendere.
+  friendsLiveCount = liveFriends.length;
+  for (const [, mk] of markers.live) mk.remove();
+  markers.live.clear();
+  liveHeadings.clear();
+  liveFriends = [];
+  // Il prossimo giro riparte da zero: senza questo, riaccendendo la
+  // condivisione, tutti gli amici già in strada verrebbero annunciati come
+  // "appena arrivati".
+  knownLive = null;
+  paintLiveFab();
+  liveSheet?.render();
 }
 
 /** Alla prima apertura, se non condividi, spieghiamo a cosa serve il tasto. */
@@ -523,7 +565,10 @@ function hintLiveSharing() {
   if (sharing) return;
   if (sessionStorage.getItem(LIVE_HINT_KEY)) return;
   sessionStorage.setItem(LIVE_HINT_KEY, '1');
-  const extra = liveFriends.length ? ` ${liveFriends.length === 1 ? 'Un amico sta condividendo' : `${liveFriends.length} amici stanno condividendo`} adesso.` : '';
+  // Non condividendo non abbiamo le loro posizioni, ma sappiamo quanti sono:
+  // è l'informazione che rende il tasto interessante.
+  const n = friendsLiveCount;
+  const extra = n ? ` ${n === 1 ? 'Un amico sta condividendo' : `${n} amici stanno condividendo`} adesso: accendi anche tu per vederli.` : '';
   toast.info(`Tocca il segnaposto in basso a destra per farti vedere dagli amici.${extra}`, { duration: 5600 });
 }
 
@@ -718,7 +763,8 @@ function livePopupHtml(u) {
 /**
  * Aggiorna i puntini di chi è live. Girando ogni LIVE_POLL_MS (più: cambio
  * vista, ritorno in primo piano, attivazione della condivisione) un amico che
- * accende la posizione compare da solo, senza toccare niente.
+ * accende la posizione compare da solo, senza toccare niente — e chi spegne
+ * sparisce entro un giro, perché il server smette di restituirlo.
  * Il flag `refreshingLive` evita che una richiesta lenta ne accodi altre.
  */
 async function refreshLive() {
@@ -727,8 +773,23 @@ async function refreshLive() {
   try {
     // Il bbox filtra solo gli sconosciuti: gli amici che condividono arrivano
     // sempre, anche lontani (li si raggiunge dal foglio "Posizione live").
-    const { users } = await api.get('/live/nearby', { bbox: viewportBbox(map) });
-    const list = users || [];
+    const res = await api.get('/live/nearby', { bbox: viewportBbox(map) });
+    const list = res.users || [];
+    friendsLiveCount = Number(res.friends_live) || 0;
+    lastLiveOkAt = Date.now();
+
+    // Il server è l'autorità sulla condivisione: se dice che è spenta (spenta da
+    // un altro dispositivo, dalle impostazioni, o consenso scaduto) ci
+    // riallineiamo invece di continuare a mostrare una mappa che non è vera.
+    if (res.sharing === false) {
+      if (sharing) { auth.patchUser({ live_enabled: 0 }); goneFromLiveMap(); }
+      // goneFromLiveMap() stima il contatore dall'ultima lista vista: il numero
+      // appena arrivato dal server è più fresco e vince.
+      friendsLiveCount = Number(res.friends_live) || 0;
+      paintLiveFab();
+      return;
+    }
+
     checkHorn(list);
     liveFriends = list.filter((u) => u.is_friend);
     paintLiveFab();
@@ -758,11 +819,12 @@ async function refreshLive() {
       }
       turnArrow(mk, liveHeading(u));
     }
-    // Rimuovi chi non è più live.
+    // Chi non è più live esce dalla mappa: ha spento la condivisione oppure il
+    // suo ultimo battito è scaduto. In entrambi i casi la sua freccia sparisce,
+    // perché una posizione ferma sarebbe una bugia.
     for (const [id, m] of markers.live) {
       if (!seen.has(id)) { m.remove(); markers.live.delete(id); liveHeadings.delete(id); }
     }
-    lastLiveOkAt = Date.now();
   } catch { /* rete assente: si riprova al giro dopo */ }
   finally { refreshingLive = false; }
 }

@@ -120,14 +120,14 @@ async function loadNearbyContent() {
       if (poiMarkers.routes.has(rt.id)) continue;
       poiMarkers.routes.set(rt.id, addMarker(map, {
         lat: rt.start_lat, lng: rt.start_lng, className: 'mk route', html: svg(catIcon(rt.category), 14),
-        popupHtml: `<strong>${esc(rt.name)}</strong><br><a href="/route.html?id=${rt.id}">Apri percorso</a>`,
+        popupHtml: `<div class="map-popup"><strong>${esc(rt.name)}</strong><a href="/route.html?id=${rt.id}">Apri percorso</a></div>`,
       }));
     }
     for (const ev of e.events || []) {
       if (poiMarkers.events.has(ev.id)) continue;
       poiMarkers.events.set(ev.id, addMarker(map, {
         lat: ev.area_lat, lng: ev.area_lng, className: 'mk event', html: svg('megaphone', 14),
-        popupHtml: `<strong>${esc(ev.name)}</strong><br><a href="/event.html?id=${ev.id}">Apri evento</a>`,
+        popupHtml: `<div class="map-popup"><strong>${esc(ev.name)}</strong><a href="/event.html?id=${ev.id}">Apri evento</a></div>`,
       }));
     }
   } catch { /* offline: la minimappa resta usabile */ }

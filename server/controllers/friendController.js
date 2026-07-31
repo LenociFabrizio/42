@@ -11,7 +11,7 @@
 import db from '../database/db.js';
 import { asyncHandler, HttpError } from '../utils/helpers.js';
 import * as v from '../utils/validate.js';
-import { FRIEND_STATUS, XP } from '../utils/constants.js';
+import { FRIEND_STATUS, XP, LIVE_STALE_SECONDS } from '../utils/constants.js';
 import { awardXp, checkBadges } from '../services/gamification.js';
 import { notify } from '../services/notifications.js';
 
@@ -21,9 +21,10 @@ import { notify } from '../services/notifications.js';
 // (con 5 minuti l'etichetta restava indietro di un'eternità percepita).
 const ONLINE_WINDOW_MS = 3 * 60 * 1000;
 // Chi sta condividendo la posizione è online per definizione: qui vale la stessa
-// finestra della live map (liveController.nearby), così un amico non risulta
-// "offline" nell'elenco mentre il suo puntino è ancora sulla mappa.
-const LIVE_WINDOW_MS = 5 * 60 * 1000;
+// finestra della live map (LIVE_STALE_SECONDS), così un amico non risulta
+// "offline" nell'elenco mentre il suo puntino è ancora sulla mappa — né il
+// contrario, che è il motivo per cui le due soglie non possono vivere separate.
+const LIVE_WINDOW_MS = LIVE_STALE_SECONDS * 1000;
 
 /**
  * Interpreta un timestamp del DB ("YYYY-MM-DD HH:MM:SS", UTC) o una stringa

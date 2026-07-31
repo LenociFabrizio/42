@@ -12,7 +12,29 @@
 import db from '../database/db.js';
 import { asyncHandler, HttpError } from '../utils/helpers.js';
 import * as v from '../utils/validate.js';
-import { LIVE_MAP_MIN_LEVEL } from '../utils/constants.js';
+import { LIVE_MAP_MIN_LEVEL, LIVE_STALE_SECONDS } from '../utils/constants.js';
+
+// Finestra di "presenza live" da usare dentro le query SQL.
+const STALE = `-${LIVE_STALE_SECONDS} seconds`;
+
+/**
+ * Spegne la condivisione e CANCELLA la posizione: non basta nasconderla, chi
+ * smette non deve lasciare tracce sulla mappa degli altri. Unico punto di
+ * verità per i due modi di smettere (PUT /settings e POST /stop): due copie
+ * della stessa UPDATE finirebbero per divergere, e la differenza sarebbe
+ * proprio un puntino fantasma rimasto acceso.
+ */
+function clearLive(userId) {
+  return db
+    .prepare(
+      `UPDATE users SET live_enabled = 0, last_lat = NULL, last_lng = NULL,
+              last_speed = NULL, last_heading = NULL, last_seen = NULL,
+              live_since = NULL, live_vehicle_id = NULL,
+              updated_at = datetime('now')
+         WHERE id = ?`
+    )
+    .run(userId);
+}
 
 /**
  * PUT /api/live/settings — attiva/disattiva la condivisione live.
@@ -36,15 +58,7 @@ export const setLive = asyncHandler(async (req, res) => {
       )
       .run(req.user.id);
   } else {
-    await db
-      .prepare(
-        `UPDATE users SET live_enabled = 0, last_lat = NULL, last_lng = NULL,
-                last_speed = NULL, last_heading = NULL, last_seen = NULL,
-                live_since = NULL, live_vehicle_id = NULL,
-                updated_at = datetime('now')
-           WHERE id = ?`
-      )
-      .run(req.user.id);
+    await clearLive(req.user.id);
   }
 
   res.json({ live_enabled: enabled });
@@ -73,20 +87,20 @@ export const updatePosition = asyncHandler(async (req, res) => {
     if (!owned) throw new HttpError(404, 'Veicolo non trovato.');
   }
 
-  // live_since: se la sessione precedente è scaduta (nessun ping da oltre 5
-  // minuti, la stessa soglia di `nearby`), questa è una NUOVA sessione online.
+  // live_since: se la sessione precedente è scaduta (nessun battito entro la
+  // finestra di `nearby`), questa è una NUOVA sessione online.
   await db
     .prepare(
       `UPDATE users SET last_lat = ?, last_lng = ?, last_speed = ?, last_heading = ?,
               live_vehicle_id = COALESCE(?, live_vehicle_id),
               live_since = CASE
                 WHEN live_since IS NULL OR last_seen IS NULL
-                  OR last_seen < datetime('now', '-5 minutes')
+                  OR last_seen < datetime('now', ?)
                 THEN datetime('now') ELSE live_since END,
               last_seen = datetime('now'), updated_at = datetime('now')
          WHERE id = ?`
     )
-    .run(lat, lng, speed, heading, vehicleId, req.user.id);
+    .run(lat, lng, speed, heading, vehicleId, STALE, req.user.id);
 
   res.json({ ok: true });
 });
@@ -110,22 +124,20 @@ export const setVehicle = asyncHandler(async (req, res) => {
 
 /** POST /api/live/stop — disattiva la condivisione e cancella la posizione. */
 export const stop = asyncHandler(async (req, res) => {
-  await db
-    .prepare(
-      `UPDATE users SET live_enabled = 0, last_lat = NULL, last_lng = NULL,
-              last_speed = NULL, last_heading = NULL, last_seen = NULL,
-              updated_at = datetime('now')
-         WHERE id = ?`
-    )
-    .run(req.user.id);
+  await clearLive(req.user.id);
   res.json({ ok: true });
 });
 
 /**
  * GET /api/live/nearby — utenti live visibili al richiedente.
- * "recent" = last_seen negli ultimi 5 minuti. Solo utenti con live_enabled = 1,
- * escluso me stesso. Regole di visibilità (con consenso già garantito da
- * live_enabled):
+ * "recent" = last_seen entro LIVE_STALE_SECONDS. Solo utenti con
+ * live_enabled = 1, escluso me stesso. Regole di visibilità (con consenso già
+ * garantito da live_enabled):
+ *   - RECIPROCITÀ: chi non condivide non vede. La mappa dei vivi è uno scambio,
+ *     non un servizio a senso unico: spegnendo la condivisione si sparisce dagli
+ *     altri E gli altri spariscono da noi, subito e da entrambe le parti.
+ *     Chi non condivide riceve solo `friends_live`: quanti amici sono in strada,
+ *     senza una singola coordinata. È l'invito ad accendere, non una posizione.
  *   - AMICO (amicizia accettata): visibile SEMPRE, senza livello minimo e
  *     SENZA filtro di viewport, purché la sua visibilità non sia 'private'.
  *   - SCONOSCIUTO (non amico): visibile SOLO se la sua visibilità è 'public',
@@ -146,6 +158,26 @@ export const nearby = asyncHandler(async (req, res) => {
        AND ((f.requester_id = u.id AND f.addressee_id = ?)
          OR (f.requester_id = ? AND f.addressee_id = u.id))
   )`;
+
+  // Condivisione spenta: nessuna posizione, solo il numero di amici in strada.
+  // È lo stesso consenso che regge la lista amici (chi è online), non una
+  // coordinata: serve a sapere che conviene accendere.
+  if (!req.user.live_enabled) {
+    const row = await db
+      .prepare(
+        `SELECT COUNT(*) AS n
+           FROM users u
+           LEFT JOIN user_settings us ON us.user_id = u.id
+          WHERE u.live_enabled = 1
+            AND u.last_seen >= datetime('now', ?)
+            AND u.last_lat IS NOT NULL AND u.last_lng IS NOT NULL
+            AND u.id != ?
+            AND COALESCE(us.location_visibility, 'friends') IN ('friends', 'public')
+            AND ${FRIEND}`
+      )
+      .get(STALE, me, me, me);
+    return res.json({ users: [], friends_live: row?.n || 0, sharing: false });
+  }
 
   // Filtro viewport opzionale (solo sconosciuti).
   let bboxSql = '1 = 1';
@@ -177,7 +209,7 @@ export const nearby = asyncHandler(async (req, res) => {
                  ORDER BY is_primary DESC, id LIMIT 1
               )
         WHERE u.live_enabled = 1
-          AND u.last_seen >= datetime('now', '-5 minutes')
+          AND u.last_seen >= datetime('now', ?)
           AND u.last_lat IS NOT NULL AND u.last_lng IS NOT NULL
           AND u.id != ?
           AND (
@@ -194,11 +226,15 @@ export const nearby = asyncHandler(async (req, res) => {
               )
         ORDER BY is_friend DESC, u.last_seen DESC`;
 
-  // I segnaposto seguono l'ordine del testo SQL: is_friend (2), u.id != ? (1),
-  // amico (2), livello minimo (1), sconosciuto (2), bbox (0 o 4).
-  const args = [me, me, me, me, me, LIVE_MAP_MIN_LEVEL, me, me, ...bboxArgs];
+  // I segnaposto seguono l'ordine del testo SQL: is_friend (2), finestra live (1),
+  // u.id != ? (1), amico (2), livello minimo (1), sconosciuto (2), bbox (0 o 4).
+  const args = [me, me, STALE, me, me, me, LIVE_MAP_MIN_LEVEL, me, me, ...bboxArgs];
 
   const rows = await db.prepare(sql).all(...args);
 
-  res.json({ users: rows });
+  res.json({
+    users: rows,
+    friends_live: rows.filter((r) => r.is_friend).length,
+    sharing: true,
+  });
 });
