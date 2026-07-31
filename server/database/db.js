@@ -141,6 +141,12 @@ async function runMigrations() {
   if (userCols.length && !hasUserCol('last_active')) {
     await db.run('ALTER TABLE users ADD COLUMN last_active TEXT');
   }
+  // Aree di gioco: area di partenza (regione italiana). Nullable di proposito —
+  // gli account creati prima di questa funzione restano validi e l'app chiede
+  // loro di scegliere l'area alla prima apertura della mappa.
+  if (userCols.length && !hasUserCol('region')) {
+    await db.run('ALTER TABLE users ADD COLUMN region TEXT');
+  }
 
   // Preferenze di navigazione (evita pedaggi, autostrade, ZTL, traghetti).
   const setCols = await db.all('PRAGMA table_info(user_settings)');

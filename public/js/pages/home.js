@@ -7,7 +7,8 @@ import '../core/theme.js';
 import { guard, auth } from '../core/auth.js';
 import { mountShell } from '../core/shell.js';
 import { registerPWA } from '../core/pwa.js';
-import { createMap, addMarker, viewportBbox, fitRadius, fitPoints, onMapReady } from '../core/map.js';
+import { createMap, addMarker, viewportBbox, fitRadius, fitPoints, onMapReady, setRegionFog, fitRegion } from '../core/map.js';
+import { ensureHomeArea, checkArea, discoveredGeoNames, homeGeoName, onAreasChange } from '../core/areas.js';
 import { getCurrentPosition, decodePolyline, haversine, bearing } from '../core/geo.js';
 import { maybeAutoStart } from '../core/onboarding.js';
 import { $, svg, loader, toast, modal, el, esc, fmtDistance, fmtDuration, fmtSpeed, fmtSince, debounce } from '../core/ui.js';
@@ -100,12 +101,18 @@ async function main() {
   map = createdMap;
   loader.hide();
 
+  // Aree di gioco: senza area di partenza la chiediamo subito (vale per gli
+  // account creati prima di questa funzione e per chi entra con Google).
+  onAreasChange(() => { paintFog(); });
+  await ensureHomeArea();
+
   // Tutorial di benvenuto alla prima apertura dopo la registrazione.
   maybeAutoStart();
   // Avviso di guida responsabile all'ingresso (una volta per sessione).
   showRideDisclaimer();
 
   onMapReady(map, () => {
+    paintFog();
     centerOnMe();
     reload();
     startWatch();
@@ -164,6 +171,8 @@ function startWatch() {
       if (!centered) { centered = true; fitRadius(map, lat, lng, mapRadiusKm, { animate: true }); }
       updateRadar(lat, lng);
       shareLive(pos.coords);
+      // Aree: il server dice se questa posizione sblocca una regione nuova.
+      checkArea(lat, lng);
     },
     () => {},
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
@@ -296,20 +305,35 @@ function updateHeading(lat, lng, coords) {
  * Inquadratura di partenza: la mappa deve aprirsi SEMPRE su di te, senza
  * dover toccare il tasto "la mia posizione".
  * 1) l'ultima posizione nota dà subito la vista giusta (nessuna attesa);
- * 2) in parallelo si chiede al GPS il punto reale, con parametri "morbidi"
+ * 2) senza nulla in memoria si inquadra la propria AREA di partenza, invece di
+ *    mostrare l'Italia intera;
+ * 3) in parallelo si chiede al GPS il punto reale, con parametri "morbidi"
  *    (accetta una posizione recente: è molto più rapida del fix preciso);
- * 3) se il permesso arriva tardi o il primo tentativo scade, ci pensa il
+ * 4) se il permesso arriva tardi o il primo tentativo scade, ci pensa il
  *    primo aggiornamento di startWatch() (vedi `centered`).
  */
 async function centerOnMe() {
+  let framed = false;
   try {
     const saved = JSON.parse(localStorage.getItem(LAST_POS_KEY) || 'null');
     if (saved && Number.isFinite(saved.lat) && Number.isFinite(saved.lng)) {
       showMe(saved.lat, saved.lng);
       fitRadius(map, saved.lat, saved.lng, mapRadiusKm, { animate: false });
+      framed = true;
     }
   } catch { /* niente in memoria: si aspetta il GPS */ }
+  // Prima apertura senza posizione salvata: si parte dalla propria area.
+  if (!framed) {
+    const home = homeGeoName();
+    if (home) fitRegion(map, home);
+  }
   await locate(false, { enableHighAccuracy: false, timeout: 20000, maximumAge: 120000 });
+}
+
+/** Svela le aree scoperte e lascia in ombra quelle ancora da conquistare. */
+function paintFog() {
+  if (!map) return;
+  setRegionFog(map, discoveredGeoNames());
 }
 
 /** Legge il raggio di visibilità preferito (Impostazioni), con fallback. */

@@ -71,14 +71,22 @@ toast.warning = (m, o) => toast(m, 'warning', o);
 toast.info = (m, o) => toast(m, 'info', o);
 
 /* ---------------- Modal / bottom-sheet ---------------- */
-export function modal({ title = '', content = '', footer = null, center = false, onClose } = {}) {
+/**
+ * Finestra modale / bottom-sheet.
+ * @param {object} o
+ * @param {boolean} [o.dismissible] se false non si chiude con la X, col tocco
+ *   fuori o con Esc: per le scelte obbligatorie (es. l'area di partenza).
+ */
+export function modal({ title = '', content = '', footer = null, center = false, dismissible = true, onClose } = {}) {
   const overlay = el('div', { class: 'modal-overlay' });
   const body = typeof content === 'string'
     ? el('div', { class: 'modal-body', html: content })
     : el('div', { class: 'modal-body' }, [content]);
   const head = el('div', { class: 'modal-head' }, [
     el('h3', { text: title }),
-    el('button', { class: 'modal-close', html: '&times;', 'aria-label': 'Chiudi', onClick: () => close() }),
+    dismissible
+      ? el('button', { class: 'modal-close', html: '&times;', 'aria-label': 'Chiudi', onClick: () => close() })
+      : null,
   ]);
   const modalEl = el('div', { class: `modal ${center ? 'center' : ''}` }, [head, body]);
   if (footer) {
@@ -87,12 +95,12 @@ export function modal({ title = '', content = '', footer = null, center = false,
     modalEl.append(foot);
   }
   overlay.append(modalEl);
-  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+  if (dismissible) overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
   document.body.append(overlay);
   document.body.style.overflow = 'hidden';
   requestAnimationFrame(() => overlay.classList.add('open'));
 
-  function onKey(e) { if (e.key === 'Escape') close(); }
+  function onKey(e) { if (dismissible && e.key === 'Escape') close(); }
   document.addEventListener('keydown', onKey);
   function close() {
     overlay.classList.remove('open');

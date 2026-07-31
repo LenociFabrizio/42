@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS users (
   last_active         TEXT,
   live_since          TEXT,                            -- inizio della sessione online corrente
   live_vehicle_id     INTEGER,                         -- veicolo che sta guidando adesso
+  -- Aree di gioco: area di partenza (codice regione italiana, vedi
+  -- server/utils/regions.js). NULL per gli account creati prima della funzione:
+  -- l'app chiede loro di scegliere alla prima apertura della mappa.
+  region              TEXT,
   is_active           INTEGER NOT NULL DEFAULT 1,
   created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -349,6 +353,20 @@ CREATE TABLE IF NOT EXISTS xp_log (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_xp_log_user ON xp_log(user_id, created_at);
+
+-- ------------------------------------------------------------
+--  AREE SCOPERTE — le regioni italiane si sbloccano entrandoci
+--  L'area di partenza (users.region) è scoperta da subito; le altre solo
+--  quando il GPS conferma il passaggio (verifica in server/utils/regions.js).
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_regions (
+  user_id             INTEGER NOT NULL,
+  region              TEXT    NOT NULL,                  -- codice area ('puglia', 'lazio', ...)
+  discovered_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, region),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_user_regions_user ON user_regions(user_id, discovered_at);
 
 -- ------------------------------------------------------------
 --  NOTIFICHE

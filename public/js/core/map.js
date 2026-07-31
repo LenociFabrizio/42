@@ -99,14 +99,22 @@ export function onMapReady(map, fn) {
   map.once('load', fn);
 }
 
+/** Confini delle regioni italiane (una sola richiesta per pagina). */
+let _regionsGeo = null;
+export function loadRegionsGeo() {
+  if (_regionsGeo) return _regionsGeo;
+  _regionsGeo = fetch('/data/italy-regions.geojson')
+    .then((res) => (res.ok ? res.json() : null))
+    .catch(() => null);
+  return _regionsGeo;
+}
+
 /** Aggiunge il perimetro delle regioni italiane come layer di linee. */
 async function addRegionBorders(map) {
   try {
     if (map.getSource('it-regions')) return;
-    const res = await fetch('/data/italy-regions.geojson');
-    if (!res.ok) return;
-    const data = await res.json();
-    if (map.getSource('it-regions')) return;
+    const data = await loadRegionsGeo();
+    if (!data || map.getSource('it-regions')) return;
     map.addSource('it-regions', { type: 'geojson', data });
     map.addLayer({
       id: 'it-regions-line',
@@ -116,6 +124,74 @@ async function addRegionBorders(map) {
       layout: { 'line-join': 'round', 'line-cap': 'round' },
     });
   } catch { /* confini non disponibili: la mappa resta usabile */ }
+}
+
+/**
+ * "Nebbia" sulle aree non ancora scoperte: le regioni che l'utente non ha mai
+ * visitato restano sotto un velo scuro col bordo tratteggiato, come una mappa
+ * di gioco ancora da esplorare. Quelle sbloccate tornano in chiaro.
+ *
+ * @param {object} map
+ * @param {string[]} discoveredGeoNames nomi (campo `name` del GeoJSON) da svelare
+ */
+export async function setRegionFog(map, discoveredGeoNames = []) {
+  // Prima che lo stile sia pronto non si possono aggiungere sorgenti: chi chiama
+  // ripassa a mappa pronta (vedi onMapReady in home.js).
+  if (!map.isStyleLoaded()) return;
+  const data = await loadRegionsGeo();
+  if (!data) return;
+  // La sorgente la crea anche addRegionBorders: le due funzioni corrono in
+  // parallelo sullo stesso `load`, quindi chi arriva secondo trova già tutto.
+  try {
+    if (!map.getSource('it-regions')) map.addSource('it-regions', { type: 'geojson', data });
+  } catch { /* creata nel frattempo */ }
+  if (!map.getSource('it-regions')) return;
+
+  try {
+    if (!map.getLayer('it-regions-fog')) {
+      map.addLayer({
+        id: 'it-regions-fog',
+        type: 'fill',
+        source: 'it-regions',
+        paint: {
+          'fill-color': '#05070b',
+          'fill-opacity': 0.66,
+          'fill-opacity-transition': { duration: 600 },
+        },
+      });
+      map.addLayer({
+        id: 'it-regions-fog-line',
+        type: 'line',
+        source: 'it-regions',
+        paint: { 'line-color': '#ffb020', 'line-opacity': 0.22, 'line-width': 1.2, 'line-dasharray': [2, 3] },
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+      });
+      // I confini "in chiaro" restano sopra il velo.
+      if (map.getLayer('it-regions-line')) map.moveLayer('it-regions-line');
+    }
+  } catch { /* layer già presenti */ }
+  if (!map.getLayer('it-regions-fog')) return;
+
+  // Il filtro tiene il velo SOLO sulle aree non ancora scoperte.
+  const filter = ['!', ['in', ['get', 'name'], ['literal', discoveredGeoNames]]];
+  map.setFilter('it-regions-fog', filter);
+  map.setFilter('it-regions-fog-line', filter);
+}
+
+/** Inquadra una regione dal suo nome nel GeoJSON. Ritorna true se riuscito. */
+export async function fitRegion(map, geoName, { padding = 30, maxZoom = 11, animate = false } = {}) {
+  const data = await loadRegionsGeo();
+  const f = data?.features?.find((x) => x.properties?.name === geoName);
+  if (!f) return false;
+  const maplibregl = window.maplibregl;
+  const b = new maplibregl.LngLatBounds();
+  const walk = (coords) => {
+    if (typeof coords[0] === 'number') b.extend(coords);
+    else coords.forEach(walk);
+  };
+  walk(f.geometry.coordinates);
+  map.fitBounds(b, { padding, maxZoom, duration: animate ? 700 : 0 });
+  return true;
 }
 
 /** Aggiunge/aggiorna una linea-percorso (points = [[lat,lng], ...]). */

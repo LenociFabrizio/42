@@ -724,6 +724,22 @@
 /* Col radar a schermo i toast scendono, così non lo coprono. */
 body.radar-on .toast-stack { top: calc(var(--topbar-h) + var(--safe-top) + 82px); }
 
+/* ---------------- Aree di gioco (regioni italiane) ----------------
+   Griglia di scelta dell'area di partenza: pastiglie compatte, la selezionata
+   si accende in ambra come i comandi attivi dell'app. */
+.area-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.area-chip {
+  padding: 8px 12px; border-radius: var(--r-pill);
+  background: var(--bg-150); color: var(--text-mid);
+  border: 1px solid var(--border-strong);
+  font-size: 0.84rem; font-weight: var(--fw-medium); cursor: pointer;
+}
+.area-chip:active { transform: scale(0.97); }
+.area-chip.on {
+  background: var(--accent-dim); color: var(--accent);
+  border-color: var(--accent); font-weight: var(--fw-semibold);
+}
+
 /* ---------------- Cornici per privacy (percorsi/eventi) ---------------- */
 .priv-private { border-color: var(--warning) !important; }
 .priv-club { border-color: #a06bff !important; box-shadow: 0 0 0 1px rgba(160, 107, 255, 0.22); }

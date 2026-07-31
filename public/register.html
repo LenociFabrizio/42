@@ -38,6 +38,17 @@
           <input class="input" type="password" name="password" autocomplete="new-password" placeholder="min. 8 caratteri" required />
           <div class="err">Almeno 8 caratteri.</div>
         </div>
+        <div class="field">
+          <label>La tua area</label>
+          <select class="input" name="region" id="region-select" required>
+            <option value="">Scegli la regione da cui parti…</option>
+          </select>
+          <div class="err">Scegli l'area da cui parti.</div>
+          <div class="text-lo" style="font-size:.78rem;margin-top:6px">
+            È la tua area di partenza: sulla mappa è già scoperta, il resto d'Italia resta in ombra
+            finché non ci entri davvero. Non si può cambiare dopo.
+          </div>
+        </div>
         <label class="checkbox" style="align-items:flex-start;gap:10px;margin-bottom:16px;font-size:.86rem">
           <input type="checkbox" name="consent" />
           <span>Ho letto e accetto la <a href="/privacy.html" target="_blank">Privacy Policy</a> e i <a href="/terms.html" target="_blank">Termini di Servizio</a>.</span>

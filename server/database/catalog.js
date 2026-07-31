@@ -9,7 +9,8 @@
  *
  * NB: i `code` dei badge devono combaciare con BADGE_RULES in
  * services/gamification.js; le `metric` delle missioni devono essere tra
- * quelle incrementate ('completions'|'distance_m'|'routes_created'|'events').
+ * quelle incrementate ('completions'|'distance_m'|'routes_created'|'events'|
+ * 'regions').
  * ------------------------------------------------------------
  */
 
@@ -36,6 +37,11 @@ export const BADGES = [
   ['level_25', 'Veterano', 'Hai raggiunto il livello 25.', '👑', 'special', 0, 'general'],
   ['streak_7', 'In Sella', 'Serie di 7 giorni consecutivi.', '🔥', 'silver', 50, 'general'],
   ['streak_30', 'Inarrestabile', 'Serie di 30 giorni consecutivi.', '🚀', 'special', 200, 'general'],
+  // Aree: si sbloccano solo entrando davvero nella regione.
+  ['region_beyond', 'Oltre il Confine', 'Hai sbloccato la tua prima area fuori da quella di partenza.', '🚧', 'bronze', 40, 'regions'],
+  ['region_5', 'Cartografo d\'Italia', 'Hai sbloccato 5 aree.', '🗺️', 'silver', 120, 'regions'],
+  ['region_10', 'Mezza Italia', 'Hai sbloccato 10 aree.', '🧭', 'gold', 300, 'regions'],
+  ['region_all', 'Stivale Completo', 'Hai sbloccato tutte e 20 le aree d\'Italia.', '🏆', 'special', 1000, 'regions'],
 ];
 
 // [code, name, description, period, metric, target, xp_reward]
@@ -49,6 +55,8 @@ export const MISSIONS = [
   ['ach_explorer', 'Grande Esploratore', 'Crea 10 percorsi.', 'achievement', 'routes_created', 10, 200],
   ['ach_marathoner', 'Maratoneta', 'Percorri 500 km in totale.', 'achievement', 'distance_m', 500000, 300],
   ['ach_eventgoer', 'Frequentatore', 'Partecipa a 5 eventi.', 'achievement', 'events', 5, 200],
+  ['weekly_region', 'Fuori Regione', 'Sblocca 1 nuova area questa settimana.', 'weekly', 'regions', 1, 150],
+  ['ach_regions_5', 'Cacciatore di Aree', 'Sblocca 5 aree d\'Italia.', 'achievement', 'regions', 5, 300],
 ];
 
 /**

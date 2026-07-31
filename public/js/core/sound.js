@@ -169,4 +169,22 @@ export function playRadarPing(intensity = 0) {
   if (k > 0.75) { try { navigator.vibrate?.(18); } catch { /* non supportato */ } }
 }
 
-export default { initSound, playNotify, playBeep, playHorn, playFriendOnline, playRadarPing, soundEnabled, setSoundEnabled };
+/**
+ * Fanfara di sblocco: tre note ascendenti con la coda che sale ancora, il
+ * classico "hai conquistato qualcosa" dei giochi arcade. Usata quando si entra
+ * in una nuova Area (regione) e la mappa si svela.
+ */
+export function playUnlock() {
+  if (!soundEnabled()) return;
+  const c = audioCtx();
+  if (!c) return;
+  if (c.state === 'suspended') c.resume().catch(() => {});
+  try {
+    note(c, { freq: 659.25, start: 0, duration: 0.12, gain: 0.16, type: 'triangle' });     // mi
+    note(c, { freq: 880, start: 0.1, duration: 0.12, gain: 0.16, type: 'triangle' });      // la
+    note(c, { freq: 1318.5, to: 1760, start: 0.2, duration: 0.34, gain: 0.18, type: 'triangle' }); // mi ↑
+  } catch { /* audio non disponibile: silenzio */ }
+  try { navigator.vibrate?.([30, 50, 30, 50, 90]); } catch { /* non supportato */ }
+}
+
+export default { initSound, playNotify, playBeep, playHorn, playFriendOnline, playRadarPing, playUnlock, soundEnabled, setSoundEnabled };

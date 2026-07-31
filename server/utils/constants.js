@@ -63,6 +63,7 @@ export const XP = {
   JOIN_CLUB: 15,
   ADD_FRIEND: 10,
   ADD_POI: 8,
+  DISCOVER_REGION: 70, // nuova area sbloccata entrandoci davvero: vale un viaggio
   // Bonus per distanza percorsa: 1 XP ogni N metri completati.
   METERS_PER_XP: 500,
   STREAK_BONUS_PER_DAY: 5, // XP extra per ogni giorno consecutivo (cap gestito nel servizio)

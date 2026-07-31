@@ -20,6 +20,11 @@ const SLIDES = [
     text: 'Si apre già centrata su di te: attorno trovi percorsi, eventi e punti di interesse. Il pulsante con il mirino ti riporta sulla tua posizione quando ti sposti a mano, e quanto "vicino" parte la mappa lo decidi dal raggio di visibilità in Impostazioni.',
   },
   {
+    ic: 'compass',
+    title: 'Aree da conquistare',
+    text: 'L\'Italia è divisa in 20 Aree: la tua regione di partenza è già scoperta, tutte le altre restano in ombra sotto un velo scuro. Si sbloccano in un solo modo: entrandoci davvero. Quando accade te lo diciamo con un suono e un avviso, arrivano XP e crescono la missione "Cacciatore di Aree" e i distintivi da "Oltre il Confine" fino a "Stivale Completo" con tutte e 20.',
+  },
+  {
     ic: 'navigation',
     title: 'Indicazioni in un tocco',
     text: 'Tocca un percorso o un evento sulla mappa e scegli "Indicazioni": calcoliamo il tragitto più veloce dalla tua posizione. In Impostazioni puoi chiedere di evitare pedaggi, autostrade, traghetti e ZTL.',

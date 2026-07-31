@@ -25,6 +25,7 @@ Sintesi delle misure implementate. Principio guida: **mai fidarsi del client**.
 - Il filtro di viewport (`bbox`) della `GET /live/nearby` vale **solo per gli sconosciuti** (che devono anche essere `public` e di livello ≥ 5). Gli **amici** che condividono arrivano sempre: è una scelta di prodotto (due amici lontani devono potersi vedere), non un allentamento del consenso.
 - Le posizioni live mostrano solo campioni recenti (ultimi 5 minuti) e solo di utenti con condivisione attiva. Disattivando la condivisione le coordinate vengono **cancellate**, non solo nascoste.
 - Il check-in agli eventi verifica la distanza dal raggio **lato server** (haversine): il client non può auto-dichiararsi presente.
+- Lo sblocco delle **Aree** (regioni) è deciso dal server: il client invia solo `{lat,lng}` a `POST /regions/visit` e il punto viene confrontato coi confini reali. L'**area di partenza** si imposta una volta sola (cambiarla equivarrebbe a regalarsi aree senza viaggiare) e il catalogo pubblico (`/regions/catalog`) espone soltanto nomi di regioni italiane.
 - **Eliminazione account** con conferma password → cancellazione a cascata di tutti i dati collegati.
 
 ## Note per la produzione (deploy futuro)

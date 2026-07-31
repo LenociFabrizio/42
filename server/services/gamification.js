@@ -95,6 +95,12 @@ const BADGE_RULES = {
   // Costanza
   streak_7: (s) => s.streak_days >= 7,
   streak_30: (s) => s.streak_days >= 30,
+  // Aree scoperte (regioni italiane): l'area di partenza conta come la prima,
+  // quindi "oltre il confine" scatta con la seconda.
+  region_beyond: (s) => s.regions_count >= 2,
+  region_5: (s) => s.regions_count >= 5,
+  region_10: (s) => s.regions_count >= 10,
+  region_all: (s) => s.regions_count >= 20,
 };
 
 /** Costruisce lo snapshot statistico usato dalle regole dei badge. */
@@ -112,6 +118,7 @@ async function buildStats(userId) {
   const clubsFounded = await db.prepare('SELECT COUNT(*) AS n FROM clubs WHERE creator_id = ?').get(userId);
   const clubsJoined = await db.prepare('SELECT COUNT(*) AS n FROM club_members WHERE user_id = ?').get(userId);
   const eventsHosted = await db.prepare('SELECT COUNT(*) AS n FROM events WHERE creator_id = ?').get(userId);
+  const regions = await db.prepare('SELECT COUNT(*) AS n FROM user_regions WHERE user_id = ?').get(userId);
 
   return {
     routes_count: u.routes_count,
@@ -126,6 +133,7 @@ async function buildStats(userId) {
     clubs_founded: clubsFounded?.n || 0,
     clubs_joined: clubsJoined?.n || 0,
     events_hosted: eventsHosted?.n || 0,
+    regions_count: regions?.n || 0,
   };
 }
 

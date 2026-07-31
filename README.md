@@ -80,6 +80,7 @@ public/
 - **Evento**: data/ora, durata, max partecipanti, percorso associato, **area + raggio**; la presenza si conferma con **check-in GPS** verificato lato server.
 - **Club**: nome univoco, privacy, membri/ruoli (creatore/moderatore/membro), livello/XP, classifiche.
 - **Amicizie**: richiesta / accetta / rifiuta, presenza (online adesso oppure "offline da…", da `users.last_active` aggiornato a ogni richiesta autenticata) e avviso con suono quando un amico entra nell'app.
+- **Aree**: le 20 regioni italiane. Alla registrazione si scegli l'**area di partenza** (già scoperta, non più modificabile); le altre restano sotto un velo scuro sulla mappa e si sbloccano **solo entrandoci davvero** — la corrispondenza punto → regione è calcolata **lato server** su `server/utils/regionsGeo.js` (generato da `public/data/italy-regions.geojson` con `npm run build:regions`). Ogni sblocco dà XP, avanza la missione "Cacciatore di Aree" e i distintivi da *Oltre il Confine* a *Stivale Completo*.
 - **Gamification**: XP da attività reale, curva livelli, badge, missioni (giornaliere/settimanali/obiettivi), streak. **Mai pay-to-win.**
 - **Live Map** multiplayer: opt-in con un tocco sul tasto della mappa (`live_enabled`); gli **amici** si vedono sempre, anche lontani, mentre agli **sconosciuti** si appare solo con visibilità `public` e dal **livello 5**.
 
@@ -89,7 +90,7 @@ Dettagli sicurezza in [`SECURITY.md`](./SECURITY.md).
 
 ## API (panoramica)
 
-`/api/auth` · `/api/users` · `/api/routes` · `/api/events` · `/api/clubs` · `/api/friends` · `/api/gamification` · `/api/notifications` · `/api/live` · `/api/pois` · `/api/settings` · `/api/feedback` · `/api/config` · `/api/health`
+`/api/auth` · `/api/users` · `/api/routes` · `/api/events` · `/api/clubs` · `/api/friends` · `/api/gamification` · `/api/notifications` · `/api/live` · `/api/regions` · `/api/pois` · `/api/settings` · `/api/feedback` · `/api/config` · `/api/health`
 
 Tutte le rotte protette usano `Authorization: Bearer <jwt>`. Le risposte d'errore hanno forma `{ "error": "messaggio" }`.
 

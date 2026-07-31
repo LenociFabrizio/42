@@ -1,6 +1,6 @@
 {
   "name": "quattro-e-due",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "4 & | 2 — community per chi ama i viaggi su 4 e/o 2 ruote: percorsi, record, eventi, club, live map.",
   "type": "module",
   "main": "server/index.js",
@@ -10,6 +10,7 @@
     "seed": "node server/database/seed.js",
     "db:reset": "node server/database/seed.js --reset",
     "stats:repair": "node server/database/repair-stats.js",
+    "build:regions": "node scripts/build-regions.cjs",
     "version:bump": "node scripts/version-bump.cjs"
   },
   "keywords": [
