@@ -85,6 +85,7 @@ async function main() {
   initSound(); // sblocca l'audio al primo tocco (policy autoplay)
 
   $('#fab-locate').innerHTML = svg('crosshair', 22);
+  $('#fab-refresh').innerHTML = svg('refresh', 22);
   // Segnaposto con una persona dentro: un tocco e sei sulla mappa degli amici.
   // Acceso = stai condividendo la posizione.
   sharing = !!user.live_enabled;
@@ -162,6 +163,7 @@ async function main() {
   });
 
   $('#fab-locate').addEventListener('click', () => locate(true));
+  $('#fab-refresh').addEventListener('click', onRefreshClick);
   $('#fab-live').addEventListener('click', onLiveFabClick);
   // Il radar è un pulsante: check-in all'evento o tentativo sul percorso.
   $('#radar').addEventListener('click', openRadarTarget);
@@ -264,6 +266,30 @@ async function locate(fly = true, opts, { quiet = false } = {}) {
   } catch {
     if (fly && !quiet) toast.warning('Posizione non disponibile. Controlla i permessi GPS.');
     return false;
+  }
+}
+
+/**
+ * Aggiornamento manuale (tasto in alto a sinistra): ricarica percorsi, eventi e
+ * POI della vista corrente e i puntini live, senza dover spostare la mappa —
+ * che è ciò che di solito fa scattare `reload`. Serve a vedere subito un evento
+ * o un percorso appena creato da qualcun altro. L'icona gira mentre carica.
+ */
+async function onRefreshClick() {
+  const fab = $('#fab-refresh');
+  if (!fab || fab.classList.contains('spinning')) return;
+  fab.classList.add('spinning');
+  const startedAt = Date.now();
+  try {
+    // reload() e refreshLive() ingoiano i propri errori (offline compreso): qui
+    // ci interessa solo dare un feedback e non lasciare l'icona a girare.
+    await Promise.all([reload(), refreshLive()]);
+    toast.success('Mappa aggiornata');
+  } finally {
+    // Un mezzo secondo minimo di rotazione anche con rete velocissima: senza,
+    // il giro sarebbe troppo breve per accorgersi che è successo qualcosa.
+    const rest = Math.max(0, 500 - (Date.now() - startedAt));
+    setTimeout(() => fab.classList.remove('spinning'), rest);
   }
 }
 

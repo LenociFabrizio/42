@@ -27,6 +27,13 @@
     <div id="map"></div>
   </div>
 
+  <!-- Aggiorna/sincronizza: ricarica percorsi ed eventi visibili senza dover
+       spostare la mappa. In alto a sinistra, sotto la topbar, stessa forma
+       (glass tondo) del tasto GPS. Vedi home.js. -->
+  <button id="fab-refresh" class="map-fab map-refresh" type="button"
+          aria-label="Aggiorna la mappa"
+          title="Aggiorna: sincronizza percorsi ed eventi"></button>
+
   <!-- Radar di prossimità (stile arcade), sotto la topbar: compare quando un
        percorso o un evento è vicino e suona sempre più fitto avvicinandosi.
        Toccalo per il check-in o per registrare un tentativo. Vedi home.js -->

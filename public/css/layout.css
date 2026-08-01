@@ -168,6 +168,17 @@
 .map-fab-stack { position: absolute; right: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2);
   bottom: calc(var(--bottomnav-h) + var(--safe-bottom) + var(--sp-3)); z-index: var(--z-hud); }
 
+/* Tasto "Aggiorna" in alto a sinistra, appena sotto la topbar (il logo). Riusa
+   .map-fab per essere identico al tasto GPS. Girando su se stesso quando si
+   sta ricaricando dà il feedback che la sincronizzazione è in corso. */
+.map-refresh {
+  position: fixed;
+  left: var(--sp-3);
+  top: calc(var(--topbar-h) + var(--safe-top) + var(--sp-2));
+  z-index: var(--z-hud);
+}
+.map-refresh.spinning svg { animation: spin 0.7s linear infinite; }
+
 /* ---------------- Bottom nav (pollice) ---------------- */
 .bottomnav {
   position: fixed;

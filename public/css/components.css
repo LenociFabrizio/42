@@ -664,7 +664,9 @@
 .radar {
   position: fixed; z-index: var(--z-hud);
   top: calc(var(--topbar-h) + var(--safe-top) + var(--sp-2));
-  left: var(--sp-3);
+  /* Centrato in alto: left/right + margin auto invece di translateX, così il
+     transform resta libero per l'animazione d'ingresso e il tocco. */
+  left: 0; right: 0; margin-inline: auto; width: fit-content;
   display: flex; align-items: center; gap: 10px;
   max-width: min(72vw, 320px);
   padding: 5px 14px 5px 5px;
