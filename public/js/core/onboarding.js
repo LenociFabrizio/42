@@ -47,7 +47,7 @@ const SLIDES = [
   {
     ic: 'pinUser',
     title: 'Vedersi in tempo reale',
-    text: 'Il tasto col segnaposto, in basso a destra, accende la condivisione: un tocco e gli amici ti vedono muoverti sulla mappa, e tu vedi loro. È uno scambio alla pari: chi spegne sparisce dalla mappa degli altri e loro dalla sua. Sulla mappa sei la freccia bianca, gli amici sono le frecce verdi e gli sconosciuti quelle rosse: la punta indica dove stanno andando. Tocca una freccia per sapere che auto o moto sta guidando; il numero sul tasto dice quanti sono in strada adesso.',
+    text: 'Il tasto col segnaposto, in basso a destra, accende la condivisione: un tocco e gli amici ti vedono muoverti sulla mappa, e tu vedi loro. È uno scambio alla pari: chi spegne sparisce dalla mappa degli altri e loro dalla sua. Sulla mappa tu sei il pallino che pulsa e la vista ti segue mentre guidi; gli amici sono le frecce verdi e gli sconosciuti quelle rosse, con la punta verso dove stanno andando. Tocca una freccia per sapere che auto o moto sta guidando; il numero sul tasto dice quanti sono in strada adesso.',
   },
   {
     ic: 'users',

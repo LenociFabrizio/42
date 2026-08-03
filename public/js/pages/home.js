@@ -37,12 +37,13 @@ let liveFriends = [];      // amici che stanno condividendo adesso
 let friendsLiveCount = 0;  // quanti sono in strada (anche se non condivido: solo il numero)
 let liveSheet = null;      // foglio "Posizione live" aperto (per aggiornarlo)
 
-/* Segnaposto in stile arcade (Need for Speed Most Wanted): una punta di freccia
-   con bordo scuro che indica la direzione di marcia, invece di un pallino che
-   lampeggia. Stessa forma per tutti i puntini vivi, colore dalla CSS via
-   `currentColor`: bianca io, verde gli amici, rossa gli sconosciuti.
-   Il triangolo interno scuro dà il rilievo tipico del HUD. */
-const arrowHtml = (size = 40) => `
+/* Segnaposto degli ALTRI piloti live: punta di freccia in stile arcade (Need for
+   Speed Most Wanted) orientata verso la loro direzione di marcia, colore dalla
+   CSS via `currentColor` — verde gli amici, rossa gli sconosciuti.
+   La MIA posizione no: quella è un pallino (vedi showMe). Su di sé la freccia
+   diceva una direzione che da fermi non esiste, e il puntino "sei qui" si
+   riconosce a colpo d'occhio senza doverlo interpretare. */
+const arrowHtml = (size = 34) => `
   <span class="arrow-mk">
     <svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" aria-hidden="true">
       <path d="M12 1.8 3.9 21.4 12 17.1 20.1 21.4 12 1.8Z" fill="currentColor" stroke="#05070b" stroke-width="1.5" stroke-linejoin="round" />
@@ -61,6 +62,17 @@ let myCoordsAt = 0;        // quando è arrivato quel fix (ms)
 // Ultima posizione salvata: apre la mappa già dalle tue parti, senza attese.
 const LAST_POS_KEY = '4e2_last_pos';
 let centered = false;      // la mappa è già stata inquadrata su di me?
+
+/* Inseguimento (follow): la mappa sta appresso alla tua posizione mentre ti
+   muovi. Si sospende appena sposti la vista a mano — stai guardando altrove, non
+   te la si può strappare da sotto le dita — e il mirino la riaccende.
+   Il tasto mostra lo stato: acceso = ti sta seguendo. */
+let follow = true;
+let watchdog = null;       // sorveglia il GPS: se tace, il watch si rifà
+let watchFails = 0;        // errori consecutivi del watch (per il ripiego)
+let lastFixAt = 0;         // ultimo fix ricevuto dal watch (ms)
+let gpsDenied = false;     // permesso negato: niente ritentativi automatici
+const FIX_STALE_MS = 20000; // oltre questo silenzio il watch si considera morto
 
 // Radar di prossimità: entro RADAR_RANGE_M il bersaglio compare sul disco,
 // RADAR_HIDE_M è l'isteresi per non farlo sfarfallare al limite, da
@@ -109,7 +121,7 @@ async function main() {
   // Sbloccando un'area cade il velo E arrivano i suoi contenuti: percorsi ed
   // eventi delle regioni non conquistate il server non li manda affatto, quindi
   // vanno richiesti di nuovo (`reload`), non solo ridisegnati.
-  onAreasChange(() => { paintFog(); reload(); });
+  onAreasChange(() => { paintFog(); reload(true); });
   await ensureHomeArea();
 
   // Tutorial di benvenuto alla prima apertura dopo la registrazione.
@@ -150,6 +162,11 @@ async function main() {
   // (Chi non condivide non ha puntini da ricaricare: solo i contenuti.)
   map.on('moveend', debounce(() => { reload(); if (sharing) refreshLive(); }, 400));
 
+  // Mano sulla mappa: trascinando si sospende l'inseguimento — stai guardando
+  // un'altra zona e la vista non deve tornare su di te da sola. Lo zoom NO:
+  // stringere sulla propria posizione è ancora seguire sé stessi.
+  map.on('dragstart', () => setFollow(false));
+
   // Tornando in primo piano i timer sono stati congelati dal sistema: ci
   // rimettiamo in pari subito, altrimenti per qualche minuto risulteremmo
   // spariti dalla mappa degli amici (e loro dalla nostra).
@@ -157,40 +174,137 @@ async function main() {
     if (document.hidden || !map) return;
     if (sharing) pushPositionNow();
     refreshLive();
+    // Il GPS in secondo piano viene sospeso dal browser e al ritorno non
+    // riparte: senza questo il tracciamento restava fermo per tutta la sessione.
+    // Col permesso negato no: si aspetta il mirino, cioè un gesto dell'utente.
+    if (!gpsDenied) restartWatch();
     // Il radar riparte con la cadenza giusta: in secondo piano il timer viene
     // strozzato dal sistema e la sequenza dei ping si sfalsa.
     if (radarSounding) radarLoop();
   });
 
-  $('#fab-locate').addEventListener('click', () => locate(true));
+  // Il mirino: riporta la vista su di te E riattacca l'inseguimento. Se il GPS
+  // era muto (watch sospeso, permesso arrivato in ritardo) lo si rimette in moto.
+  $('#fab-locate').addEventListener('click', () => {
+    setFollow(true);
+    locate(true);
+    if (watchId == null) { watchFails = 0; gpsDenied = false; startWatch(); }
+    else if (Date.now() - lastFixAt > FIX_STALE_MS) restartWatch();
+  });
+  setFollow(true); // stato iniziale: la mappa ti segue
   $('#fab-refresh').addEventListener('click', onRefreshClick);
   $('#fab-live').addEventListener('click', onLiveFabClick);
   // Il radar è un pulsante: check-in all'evento o tentativo sul percorso.
   $('#radar').addEventListener('click', openRadarTarget);
 }
 
-/** Segue la posizione (aggiorna il marker "tu") e valuta la prossimità. */
+/**
+ * Segue la posizione: aggiorna il pallino "tu", tiene la mappa appresso a te
+ * (vedi keepInView) e valuta la prossimità.
+ *
+ * `maximumAge: 0` perché qui serve il fix di ADESSO: accettando una posizione in
+ * cache il browser può ripetere per minuti lo stesso punto, e il tracciamento
+ * sembra fermo mentre stai guidando.
+ */
 function startWatch() {
   if (!('geolocation' in navigator) || watchId != null) return;
-  watchId = navigator.geolocation.watchPosition(
-    (pos) => {
-      const lat = pos.coords.latitude, lng = pos.coords.longitude;
-      updateHeading(lat, lng, pos.coords);
-      myPos = { lat, lng };
-      myCoords = pos.coords;
-      myCoordsAt = Date.now();
-      showMe(lat, lng);
-      // Se l'inquadratura iniziale non è ancora riuscita (permesso concesso
-      // in ritardo, primo fix lento), il primo aggiornamento centra la mappa.
-      if (!centered) { centered = true; fitRadius(map, lat, lng, mapRadiusKm, { animate: true }); }
-      updateRadar(lat, lng);
-      shareLive(pos.coords);
-      // Aree: il server dice se questa posizione sblocca una regione nuova.
-      checkArea(lat, lng);
-    },
-    () => {},
-    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
-  );
+  // Dopo due errori di fila si ripiega sulla localizzazione "morbida" (rete,
+  // celle): meglio un punto approssimato che nessun punto.
+  const soft = watchFails >= 2;
+  watchId = navigator.geolocation.watchPosition(onFix, onWatchError, {
+    enableHighAccuracy: !soft,
+    maximumAge: 0,
+    timeout: soft ? 30000 : 20000,
+  });
+  startWatchdog();
+}
+
+function stopWatch() {
+  if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+}
+
+/**
+ * Rifà il watch da zero. Serve perché il GPS può SMETTERE di richiamarci senza
+ * dire niente: il browser sospende la geolocalizzazione quando la pagina va in
+ * secondo piano (schermo spento, cambio app) e al ritorno spesso non riparte da
+ * sé. Era questo a far sembrare il tracciamento rotto: il mirino funzionava
+ * (chiede una posizione nuova ogni volta) ma nessun aggiornamento arrivava più.
+ */
+function restartWatch() {
+  stopWatch();
+  startWatch();
+}
+
+/** Se il GPS tace troppo, il watch è morto: si rifà. */
+function startWatchdog() {
+  clearInterval(watchdog);
+  watchdog = setInterval(() => {
+    if (document.hidden || watchId == null) return;
+    if (lastFixAt && Date.now() - lastFixAt > FIX_STALE_MS) restartWatch();
+  }, 10000);
+}
+
+function onFix(pos) {
+  const lat = pos.coords.latitude, lng = pos.coords.longitude;
+  lastFixAt = Date.now();
+  watchFails = 0;
+  updateHeading(lat, lng, pos.coords);
+  myPos = { lat, lng };
+  myCoords = pos.coords;
+  myCoordsAt = lastFixAt;
+  showMe(lat, lng);
+  // Prima inquadratura, se non è ancora riuscita (permesso concesso in ritardo,
+  // primo fix lento); poi ci pensa l'inseguimento.
+  if (!centered) { centered = true; fitRadius(map, lat, lng, mapRadiusKm, { animate: true }); }
+  else keepInView(lat, lng);
+  updateRadar(lat, lng);
+  shareLive(pos.coords);
+  // Aree: il server dice se questa posizione sblocca una regione nuova.
+  checkArea(lat, lng);
+}
+
+/**
+ * Errore del watch. Il permesso negato è definitivo: si smette e si dice perché
+ * (in silenzio l'utente resta a chiedersi cosa sia rotto). Timeout e posizione
+ * momentaneamente non disponibile no: si riprova, ammorbidendo i requisiti.
+ */
+function onWatchError(err) {
+  if (err?.code === 1 /* PERMISSION_DENIED */) {
+    stopWatch();
+    clearInterval(watchdog);
+    if (!gpsDenied) {
+      gpsDenied = true;
+      toast.warning('Tracciamento non attivo: consenti la posizione a questo sito per farti seguire dalla mappa.', { duration: 6000 });
+    }
+    return;
+  }
+  watchFails++;
+  stopWatch();
+  setTimeout(() => { if (!document.hidden && watchId == null) startWatch(); }, Math.min(2000 * watchFails, 10000));
+}
+
+/**
+ * Inseguimento: tiene la tua posizione dentro il riquadro centrale dello schermo
+ * invece di ricentrare a ogni fix. Così il tracciamento non trema quando sei
+ * fermo (il GPS oscilla di qualche metro anche da parcheggiato) e non litiga con
+ * l'animazione precedente mentre sei in movimento.
+ */
+function keepInView(lat, lng) {
+  if (!follow || !map) return;
+  const box = map.getContainer();
+  const w = box.clientWidth, h = box.clientHeight;
+  if (!w || !h) return;
+  const p = map.project([lng, lat]);
+  const offX = Math.abs(p.x - w / 2), offY = Math.abs(p.y - h / 2);
+  // Fuori dal 36% centrale (18% per lato): si torna al centro con calma.
+  if (offX < w * 0.18 && offY < h * 0.18) return;
+  map.easeTo({ center: [lng, lat], duration: 900, essential: true });
+}
+
+/** Accende/spegne l'inseguimento e lo dice sul mirino. */
+function setFollow(on) {
+  follow = on;
+  $('#fab-locate')?.classList.toggle('active', on);
 }
 
 /**
@@ -207,9 +321,11 @@ async function shareLive(coords) {
     await api.post('/live/position', {
       lat: coords.latitude,
       lng: coords.longitude,
-      // speed in m/s dal GPS → km/h; heading può essere null se fermo.
+      // speed in m/s dal GPS → km/h; heading può essere null se fermo, e allora
+      // si manda l'ultima direzione ricavata dallo spostamento: gli amici ti
+      // vedono come freccia, che senza direzione scatterebbe a nord.
       speed: Number.isFinite(coords.speed) && coords.speed >= 0 ? coords.speed * 3.6 : null,
-      heading: Number.isFinite(coords.heading) ? coords.heading : null,
+      heading: Number.isFinite(coords.heading) && coords.heading >= 0 ? coords.heading : (myHeading || null),
     });
     lastShareOkAt = Date.now();
     return true;
@@ -283,7 +399,10 @@ async function onRefreshClick() {
   try {
     // reload() e refreshLive() ingoiano i propri errori (offline compreso): qui
     // ci interessa solo dare un feedback e non lasciare l'icona a girare.
-    await Promise.all([reload(), refreshLive()]);
+    // `force`: la richiesta è esplicita, quindi salta il filtro "vista ferma"
+    // di reload — altrimenti questo tasto direbbe "aggiornata" senza aver
+    // chiesto niente al server, che è il solo caso in cui serve davvero.
+    await Promise.all([reload(true), refreshLive()]);
     toast.success('Mappa aggiornata');
   } finally {
     // Un mezzo secondo minimo di rotazione anche con rete velocissima: senza,
@@ -293,11 +412,13 @@ async function onRefreshClick() {
   }
 }
 
-/** Marker "tu" + memoria dell'ultima posizione (per la prossima apertura). */
+/**
+ * Marker "tu": il PALLINO che pulsa, non la freccia. Più memoria dell'ultima
+ * posizione, per aprire la mappa già dalle tue parti la volta dopo.
+ */
 function showMe(lat, lng) {
   if (userMarker) userMarker.setLngLat([lng, lat]);
-  else userMarker = addMarker(map, { lat, lng, className: 'mk-player', html: arrowHtml(40) });
-  turnArrow(userMarker, myHeading);
+  else userMarker = addMarker(map, { lat, lng, className: 'mk-me pulse' });
   try { localStorage.setItem(LAST_POS_KEY, JSON.stringify({ lat, lng })); } catch { /* quota */ }
 }
 
@@ -326,8 +447,11 @@ function liveHeading(u) {
 /**
  * Direzione di marcia: il `heading` del GPS quando è affidabile (serve un minimo
  * di movimento), altrimenti la si ricava dallo spostamento rispetto al punto
- * precedente. Da fermi si tiene l'ultima direzione valida: la freccia non deve
- * mettersi a girare a vuoto per colpa del rumore del GPS.
+ * precedente. Da fermi si tiene l'ultima direzione valida, così non gira a vuoto
+ * per il rumore del GPS.
+ *
+ * Sulla propria mappa non si vede (là sei un pallino): è la direzione che si
+ * MANDA agli amici, che ti vedono come freccia — vedi shareLive.
  */
 function updateHeading(lat, lng, coords) {
   const spd = Number.isFinite(coords?.speed) ? coords.speed : null;
@@ -393,8 +517,21 @@ async function loadMapRadius() {
   } catch { /* si resta sul default */ }
 }
 
-/** Ricarica percorsi/eventi/POI visibili nella viewport. */
-const reload = async () => {
+/**
+ * Ricarica percorsi/eventi/POI visibili nella viewport.
+ *
+ * Con l'inseguimento attivo la vista si muove in continuazione: senza questo
+ * filtro ogni scatto della mappa mentre si guida sarebbe un giro di tre
+ * richieste. Si ricarica solo quando la vista si è spostata davvero (250 m) o è
+ * cambiato lo zoom; `force` serve a chi ha dati nuovi da prendere comunque
+ * (un'area appena sbloccata cambia ciò che il server manda).
+ */
+let lastLoad = null; // { lat, lng, zoom } della vista già caricata
+const reload = async (force = false) => {
+  const c = map.getCenter(), z = map.getZoom();
+  if (!force && lastLoad && Math.abs(z - lastLoad.zoom) < 0.15
+      && haversine(lastLoad.lat, lastLoad.lng, c.lat, c.lng) < 250) return;
+  lastLoad = { lat: c.lat, lng: c.lng, zoom: z };
   const bbox = viewportBbox(map);
   try {
     const [r, e, p] = await Promise.all([
@@ -409,7 +546,9 @@ const reload = async () => {
     syncPois(p.pois || []);
     // Con dati nuovi il bersaglio del radar può cambiare anche stando fermi.
     if (myPos) updateRadar(myPos.lat, myPos.lng);
-  } catch { /* offline: silenzioso */ }
+  } catch {
+    lastLoad = null; // offline: silenzioso, ma il prossimo giro deve riprovare
+  }
 };
 
 function syncRoutes(routes) {
@@ -467,6 +606,9 @@ function openRouteSheet(rt) {
   // Indicazioni fino alla PARTENZA del percorso.
   nav.addEventListener('click', () => {
     m.close();
+    // Il tragitto va inquadrato tutto: l'inseguimento lo riporterebbe su di te
+    // al primo fix, cancellando la vista d'insieme appena disegnata.
+    setFollow(false);
     showDirections({ map, dest: { lat: rt.start_lat, lng: rt.start_lng }, name: rt.name, openHref: `/route.html?id=${rt.id}` });
   });
 }
@@ -486,6 +628,7 @@ function openEventSheet(ev) {
   const m = modal({ title: ev.name, content: body });
   nav.addEventListener('click', () => {
     m.close();
+    setFollow(false); // come sopra: il tragitto si guarda intero
     showDirections({ map, dest: { lat: ev.area_lat, lng: ev.area_lng }, name: ev.name, openHref: `/event.html?id=${ev.id}` });
   });
 }
@@ -621,12 +764,14 @@ function fitLiveFriends() {
   if (myPos) pts.push([myPos.lat, myPos.lng]);
   if (!pts.length) return;
   centered = true; // niente ricentramenti automatici sopra questa inquadratura
+  setFollow(false); // ...e nemmeno l'inseguimento: qui si guarda il gruppo
   fitPoints(map, pts, { padding: 70, maxZoom: 15 });
 }
 
 /** Porta la mappa su un amico e apre il suo popup. */
 function focusFriend(u) {
   centered = true;
+  setFollow(false); // stai guardando lui: la vista non deve tornare su di te
   map.flyTo({ center: [u.last_lng, u.last_lat], zoom: Math.max(map.getZoom(), 14), duration: 800 });
   const mk = markers.live.get(u.id);
   if (mk && !mk.getPopup()?.isOpen()) mk.togglePopup();
@@ -836,8 +981,8 @@ async function refreshLive() {
     for (const u of list) {
       seen.add(u.id);
       const html = livePopupHtml(u);
-      // Stessa freccia della mia posizione: verde se è un amico, rossa se è uno
-      // sconosciuto. Il colore lo mette la CSS, qui basta la classe.
+      // Freccia verde se è un amico, rossa se è uno sconosciuto (io invece sono
+      // il pallino): il colore lo mette la CSS, qui basta la classe.
       const cls = `mk-live ${u.is_friend ? 'friend' : 'stranger'}`;
       let mk = markers.live.get(u.id);
       if (mk) {

@@ -314,18 +314,21 @@
 .mk.club { background: #a06bff; }
 /* Marker utente (punti di un tracciato, posizione in registrazione) */
 .mk-user { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg-000); box-shadow: 0 0 0 4px var(--accent-glow); }
-/* Frecce stile HUD arcade (NFS Most Wanted) orientate verso la direzione di
-   marcia: niente lampeggio, la punta dice già dove si sta andando.
-   Codice colore: BIANCA la tua posizione, VERDE gli amici, ROSSA gli
-   sconosciuti. Forma identica per tutti, il colore arriva da `currentColor`. */
+/* La TUA posizione sulla mappa: il pallino "sei qui" — nucleo chiaro, anello
+   ambra e alone che pulsa (classe .pulse, vedi animations.css). L'alone lo
+   disegna l'animazione con box-shadow, quindi l'ombra di distacco sta nel
+   `filter`: così le due non si sovrascrivono. */
+.mk-me {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #f7f9fc; border: 3px solid var(--accent);
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.85));
+  pointer-events: none;
+}
+/* Frecce stile HUD arcade (NFS Most Wanted) degli ALTRI piloti live, orientate
+   verso la loro direzione di marcia: VERDE gli amici, ROSSA gli sconosciuti.
+   Forma identica per tutti, il colore arriva da `currentColor`. */
 .arrow-mk { display: block; transform-origin: center; transition: transform 0.4s ease-out; }
 .arrow-mk svg { display: block; }
-
-.mk-player {
-  width: 40px; height: 40px; display: block; pointer-events: none;
-  color: #f7f9fc;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 11px var(--accent-glow));
-}
 /* Partecipanti a un evento (pagina evento): avatar nel cerchio. Lì la gente è
    al ritrovo, non in movimento: la faccia dice più della direzione. */
 .mk-friend { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--accent); overflow: hidden; box-shadow: var(--sh-md); background: var(--bg-150); cursor: pointer; }
